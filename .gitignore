@@ -1,0 +1,10 @@
+.DS_Store
+
+# Vendor documents are retained locally for engineering reference. Keep their
+# original files and generated full-text copies out of a future public commit
+# unless their redistribution status has been reviewed.
+docs/datasheets/**/*.pdf
+docs/datasheets/**/*.md
+docs/datasheets/**/*.assets/
+docs/datasheets/**/*.lock.json
+!docs/datasheets/**/README.md
