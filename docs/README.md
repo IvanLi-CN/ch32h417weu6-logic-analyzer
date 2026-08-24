@@ -17,9 +17,12 @@
   the 1.5 uH output inductor.
 - [CH32H417 Power Sequencing](research/ch32h417-power-sequencing.md): MCU
   supply constraints and EA3036C EN startup control.
-- [Power Architecture](research/power-architecture.md): selected 3.32 V and
-  1.218 V rails, external-`VIO18` evidence boundary, TPS25200 conditional
-  values, and the hardware-only HD3SS3220 power-on controller.
+- [Power Architecture](research/power-architecture.md): CH1 `3V3`, CH2
+  external-`VIO18`, and CH3 `1V2` mapping; local `3V3`-referenced EA3036C
+  enables; TPS25200 values; and the hardware-only HD3SS3220 power-on controller.
+- [CH32H417WEU6 HSADC and VIO18 Operating Constraints](research/ch32h417weu6-hsadc-vio18-constraints.md):
+  fixed 3.32-V HSADC supplies, selectable 1.80/2.50/3.00-V capture `VIO18`,
+  and the remaining external-rail handover boundary.
 - [TPS25200 Peripheral Selection](research/tps25200-peripherals.md):
   project-specific capacitors, current-limit resistor, enable, fault, TVS,
   and layout choices.
@@ -29,6 +32,14 @@
 - [External VIO18 Official Evidence](research/vio18-external-handover-official-evidence.md):
   WCH-only evidence defining what is and is not established for external
   `VIO18` operation.
+- [CH32H417 External VIO18 DAC-Control Official Analysis](research/ch32h417-external-vio18-dac-control-official-analysis.md):
+  complete WCH-only reset, register, and transition analysis for the existing
+  independent external rail.
+- [CH32H417WEU6 External VIO18 Reset and EA3036C Enable Strategy](research/ch32h417-vio18-en-gated-dac-assessment.md):
+  PA5/DAC2 reset evidence, the selected non-MCU enable network, and its
+  documented timing boundary.
+- [CH32H417 Official WCH Source Register](research/ch32h417-official-source-register.md):
+  exact official data sheet, reference manual, and EVT sources used.
 
 ## Datasheets
 
@@ -38,6 +49,10 @@
 - [TI OPA2356 Datasheet Source Note](datasheets/ti-opa2356-datasheet/README.md)
 - [TI OPA2365 Datasheet Source Note](datasheets/ti-opa2365-datasheet/README.md)
 - [TI TPS389x Datasheet Source Note](datasheets/ti-tps3896-datasheet/README.md)
+
+## Reference Manuals
+
+- [WCH CH32H417 Reference Manual Source Note](manuals/wch-ch32h417-reference-manual/README.md)
 
 ## Supplied Evidence
 

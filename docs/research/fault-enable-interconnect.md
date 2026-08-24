@@ -28,7 +28,7 @@ so it is not a complete input-overvoltage interlock.
 | --- | --- | --- | --- |
 | TPS25200 | `EN` | Input; high enables the eFuse power switch. | `300 kOhm` pull-up to `VBUS_RAW`; no cross-chip connection. |
 | TPS25200 | `FAULT` | Active-low open-drain output for overcurrent, overtemperature, or OVLO; it does not assert in OVC mode. | Leave NC; no reliable downstream-MCU observation function is selected. |
-| EA3036C | `EN1`, `EN2`, `EN3` | Inputs; high enables the respective buck channel. No external fault-status output exists. | All three connect directly to `VBUS_5V_PROTECTED`. No EN RC and no cross-chip control is selected. |
+| EA3036C | `EN1`, `EN2`, `EN3` | Inputs; high enables the respective buck channel. No external fault-status output exists. | `EN1` connects to `VBUS_5V_PROTECTED`; `EN2` and `EN3` use separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No cross-chip fault control is selected. |
 | HD3SS3220 | `ENn_CC` | Input; low enables the CC controller. | No connection to TPS25200 or EA3036C control pins. Connect to the TPS3898A open-drain output with a VDD5 pull-up; the supervisor releases it only after `VCC33` is valid. |
 | HD3SS3220 | `ENn_MUX` | Input; low enables the SuperSpeed mux. | Tie to GND in this fixed UFP design. |
 | HD3SS3220 | `VCONN_FAULT_N` | Active-low open-drain output only for VCONN overcurrent. | Leave NC: a fixed UFP/Sink does not source VCONN. |
@@ -47,15 +47,17 @@ so it is not a complete input-overvoltage interlock.
 ## Why `TPS25200.FAULT -> EA3036C.ENx` Is Not Used
 
 `TPS25200.FAULT` is an open-drain sink. A dedicated hardware-hiccup design
-could pull an EA3036C EN node low with it, provided that EN is pulled up from
-`VBUS_5V_PROTECTED` and the FAULT sink-current limit is respected. That is a
-different power-policy design, not a free connection in the selected circuit.
+could pull an EA3036C EN node low with it, provided that the individual EN
+pull-up/RC network and the FAULT sink-current limit are analyzed together.
+That is a different power-policy design, not a free connection in the selected
+circuit.
 
-All three EA3036C enables are intentionally direct-connected to
-`VBUS_5V_PROTECTED`. This establishes the selected always-on CH32H417 power
-policy; it is not an HD3SS3220 timing guarantee. The TPS25200 does not assert
-FAULT in OVC mode, so a FAULT-to-EN connection cannot serve as a general
-input-overvoltage shutdown policy.
+The EA3036C enables are intentionally local-only: `EN1` is connected to
+`VBUS_5V_PROTECTED`, while `EN2` and `EN3` are delayed from `3V3` through their
+own RC networks. This establishes the selected always-on CH32H417 power policy;
+it is not an HD3SS3220 timing guarantee. The TPS25200 does not assert FAULT in
+OVC mode, so a FAULT-to-EN connection cannot serve as a general input-overvoltage
+shutdown policy.
 
 An earlier documentation proposal to pull FAULT up to `VIO18` and read it with
 the MCU is withdrawn. `VIO18` and the MCU are both downstream of TPS25200 OUT,
@@ -73,8 +75,8 @@ TPS25200 EN       <- 300 kOhm <- VBUS_RAW
 TPS25200 FAULT    <- NC
 
 EA3036C EN1       <- VBUS_5V_PROTECTED
-EA3036C EN2       <- VBUS_5V_PROTECTED
-EA3036C EN3       <- VBUS_5V_PROTECTED
+EA3036C EN2       <- 3V3 through R5 = 10 kOhm; C15 = 100 nF to GND
+EA3036C EN3       <- 3V3 through R6 = 10 kOhm; C16 = 100 nF to GND
 
 HD3SS3220 ENn_CC  <- TPS3898A.SENSE_OUT, with 12 kOhm pull-up to VDD5
 HD3SS3220 ENn_MUX <- GND

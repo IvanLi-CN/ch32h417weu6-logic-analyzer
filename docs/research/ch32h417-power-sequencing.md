@@ -27,23 +27,25 @@ VDD33A >= VREFP
 The selected rail mapping is:
 
 ```text
-3.32 V fixed -> VDD33, VDD33A, VDDIO, VREFP
-1.218 V fixed -> VDDK and VDD12A
-existing external VIO18 -> CH32 VIO18, SN74LVC16244A, HD3SS3220 I2C pull-ups
+EA3036C CH1 / 3V3 (3.32-V target) -> VDD33, VDD33A, VDDIO, VREFP(internal)
+EA3036C CH2 / 1V8 (DAC-adjustable VIO18) -> CH32 VIO18, SN74LVC16244A, HD3SS3220 I2C pull-ups
+EA3036C CH3 / 1V2 (1.218-V target) -> VDDK and VDD12A
 ```
 
-There is no standalone fixed 1.8-V buck rail. The 1.2-V rail is a power rail;
-it is not a 1.2-V probe-logic requirement.
+The PCB net name `1V8` denotes the default external `VIO18` mode; it does not
+remove the selected 2.50-V and 3.00-V capture modes. The `1V2` rail is a power
+rail; it is not a 1.2-V probe-logic requirement.
 
 The power-on table specifies ramp limits for `VDD33` and `VDD33A`. It does
 not specify a required startup delay for `VDD12A`, `VDDK`, `VDDIO`, or
 `VIO18`. The `1.2 V` rail here is a power rail; it is not a requirement to
 capture `1.2 V` probe logic.
 
-For this project, the fixed 3.32-V main domain and the 1.218-V core/USB3 domain
-may start together. `VIO18` is externally supplied by product requirement, but
+For this project, CH1 begins from `VDD5`; CH2 and CH3 are then passively
+released from the `3V3` rail through equal RC networks. WCH does not require a
+CH2-to-CH3 order. `VIO18` is externally supplied by product requirement, but
 the available WCH data sheet does not define an external-supply handover with
-the internal I/O LDO. Therefore no `XO` value, DAC startup sequence, or CH3
+the internal I/O LDO. Therefore no `XO` value, DAC startup sequence, or CH2
 feedback alteration is selected in this document. Preserve the existing
 external-VIO18 schematic until an official WCH source establishes one.
 
@@ -58,16 +60,16 @@ internal VDD12 regulator voltage when external power is supplied.
 
 The 20-ms wait is a first-board firmware guard, not a data-sheet rail-order
 requirement. Keep it until a scope capture proves that both 1.22-V pins are
-stable before the call; it may then be reduced. It does not change the
-hardware policy: all EA3036C `EN` pins still connect directly to `VDD5`.
+stable before the call; it may then be reduced. It does not change the hardware
+policy: this rail is EA3036C CH3, enabled by its local `3V3`-referenced RC
+network.
 
 ## EA3036C EN Pins
 
-`EN1`, `EN2`, and `EN3` are independent on/off inputs. They must not float.
-The EA3036C data sheet specifies an EN high level of at least `1.4 V`, an EN
-low level of at most `0.4 V`, and an absolute maximum of `6.5 V` for the EN
-pins. With the normal `2.7 V` to `5.5 V` input range, connecting `ENx`
-directly to `VINx` is electrically valid.
+`EN1`, `EN2`, and `EN3` are independent on/off inputs. EA3036C Ver. 1.4
+page 2 describes the per-channel EN functions and says EN1 and EN3 must not
+float; page 11 states that the three channels can be controlled by their
+individual EN pins. Page 5 specifies `V_EN-L <= 0.4 V` and `V_EN-H >= 1.4 V`.
 
 The data sheet also shows an optional startup-delay circuit for each channel:
 
@@ -79,38 +81,47 @@ VINx --- 100 kOhm --- ENx
                    GND
 ```
 
-This RC network delays the EN pin crossing its high threshold and allows the
-startup time of each channel to be programmed. It does not set the regulator
-output voltage. Equal RC values on all three channels produce approximately
-the same delayed start; they do not create a three-step sequence. Different
-RC values are needed for a passive sequence.
+This RC network delays the EN pin transition and allows the startup time of
+each channel to be programmed. It does not set the regulator output voltage.
+Equal RC values do not create a three-step sequence. Different RC values are
+needed only when a passive relative sequence is an explicit requirement.
 
-Therefore:
+The current board uses this policy:
 
-- Tie `ENx` directly to `VINx` when the channel should be always on as soon
-  as the input is valid.
-- Use the RC network only when a delayed or staged startup is actually
-  needed.
-- In every case, give each EN pin a deterministic high or low state; never
-  leave it as an un-driven named net.
+```text
+EN1 <- VDD5
+EN2 <- 3V3 through R5 = 10 kOhm, with C15 = 100 nF to GND
+EN3 <- 3V3 through R6 = 10 kOhm, with C16 = 100 nF to GND
+```
+
+The two delayed paths have a nominal `1 ms` RC constant and intentionally start
+without a relative CH2/CH3 order. They do not use MCU GPIO, PGOOD, or a
+CH2-to-EN3 cascade. EA3036C does not state an EN-threshold upper bound, an EN
+input timing model, or a maximum output-start/stability time. The current
+constant is therefore a nominal delay, not a data-sheet proof that `3V3` is
+fully stable before the other two channels start. This does not violate a WCH
+rail-order requirement because none is specified.
 
 This conclusion covers the CH32H417 and EA3036C rails only. It does not waive
 the independent HD3SS3220 `VDD5`/`VCC33` power-on constraint. That requirement
 is handled by the dedicated TPS3898A circuit, not by changing EA3036C EN pins.
 
-## Recommendation for the New Board
+## Selected Implementation
 
-Do not add EN RC components merely because the MCU has multiple supply
-domains. All three EA3036C EN pins connect directly to `VDD5`. A deliberate
-rail order would be a different system-level requirement, not a CH32H417
-requirement and not a substitute for HD3SS3220 controlled `ENn_CC`.
+Retain the local `3V3`-referenced RC enables. Do not add MCU control, a
+power-good signal, or a CH2-to-EN3 cascade merely because the MCU has multiple
+supply domains. A hard guaranteed "CH1 fully settled before the other channels
+may start" criterion would be a separate system-level requirement; the present
+EA3036C data sheet does not provide enough worst-case parameters to certify a
+component value for it. This does not replace the separately required
+HD3SS3220 controlled `ENn_CC` circuit.
 
 ## Sources
 
 - [WCH CH32H417 data-sheet page](https://www.wch-ic.com/downloads/CH32H417DS0_PDF.html)
 - [WCH CH32H417 SDK external-VDD12 example](https://github.com/openwch/ch32h417/tree/main/EVT/EXAM/PWR/VDD12_ExternPower)
 - Local copy: `docs/datasheets/wch-ch32h417-datasheet/CH32H417DS0.PDF`
-- [EA3036C vendor data sheet hosted by LCSC](https://datasheet.lcsc.com/szlcsc/2005300208_Everanalog-IC-design-EA3036C_C570857.pdf)
+- [EA3036C vendor data sheet hosted by LCSC, Ver. 1.4](https://datasheet.lcsc.com/datasheet/pdf/d83e9c52d5fbdb916908193b63b8ae60.pdf?productCode=C570857), pages 2, 5, and 11.
 - Local copy: `docs/datasheets/everanalog-ea3036c-datasheet/EA3036C.pdf`
 - [Power Architecture](power-architecture.md): final rail assignment, load
   budget, and HD3SS3220 power-good circuit.

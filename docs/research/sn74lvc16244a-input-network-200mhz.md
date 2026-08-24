@@ -6,7 +6,11 @@
 以及该网络相对于 16 通道、200 MS/s 捕获目标的可证明边界。它不以参考项目
 的元件值替代器件数据表、PCB 寄生参数或样机测量。
 
-当前工程的 U1 所有供电脚连接 `1V8`，所有 `OE#` 脚接地。每个数字输入的拓扑为：
+当前工程的 U1 所有供电脚连接 `1V8`，所有 `OE#` 脚直接接地；在 `VCC`
+有效时，四个输出组均始终使能。没有 `CAPTURE_OE_N`、PB2 或其他 MCU 输出
+门控。TI `SN74LVC16244A` Rev. C 第 11 页 §9.4、Table 3 定义 `OE = L` 时
+`Y` 跟随 `A`，`OE = H` 时 `Y` 为高阻，因此直连地是该器件的确定使能状态。
+每个数字输入的拓扑为：
 
 ```text
 H1 CHx -> TPD4E05U06 -> 47 ohm -> U1 Ax
@@ -122,7 +126,7 @@ TVS 的标称参数不足以证明 U1 的正向过压安全。必须按目标 ES
 
 ## Sources
 
-- [TI SN74LVC16244A 16-Bit Buffer/Driver With 3-State Outputs](https://www.ti.com/lit/ds/symlink/sn74lvc16244a.pdf)
+- [TI SN74LVC16244A 16-Bit Buffer/Driver With 3-State Outputs, Rev. C, p. 11, Section 9.4, Table 3](https://www.ti.com/lit/ds/symlink/sn74lvc16244a.pdf)
 - [TI TPD4E05U06 Quad-Channel ESD Protection Device](https://www.ti.com/lit/ds/symlink/tpd4e05u06.pdf)
 - [Project hardware requirements](project-requirements.md)
 - [Logic capture and HSADC layout rules](logic-adc-layout.md)

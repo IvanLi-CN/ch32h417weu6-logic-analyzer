@@ -8,3 +8,10 @@ docs/datasheets/**/*.md
 docs/datasheets/**/*.assets/
 docs/datasheets/**/*.lock.json
 !docs/datasheets/**/README.md
+
+# Reference manuals follow the same local-only policy as vendor data sheets.
+docs/manuals/**/*.pdf
+docs/manuals/**/*.md
+docs/manuals/**/*.assets/
+docs/manuals/**/*.lock.json
+!docs/manuals/**/README.md

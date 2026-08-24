@@ -12,9 +12,9 @@ matching a reference board's component names or propagation-delay values.
 | --- | --- | --- | --- |
 | Main MCU | `CH32H417WEU6` | Selected | QFN68 supports the required USB 3.0 capture path while materially reducing board area compared with QEU6. |
 | USB-C CC controller and SuperSpeed mux | `HD3SS3220`, I2C-managed UFP/Sink | Selected | One IC provides fixed device-side CC handling, automatic cable orientation, and a 10 Gbps-capable mux for the required 5 Gbps link. |
-| Capture voltage domain | Existing schematic-defined external `VIO18` shared by MCU and buffer | Product requirement | The product requires external `VIO18`; no new CH3 feedback, `XO`, or handover circuit is selected by this document. |
+| Capture voltage domain | Existing schematic-defined external `VIO18` shared by MCU and buffer | Product requirement | The product requires external `VIO18` from EA3036C CH2; no new CH2 feedback, `XO`, or handover circuit is selected by this document. |
 | Digital input buffer | `SN74LVC16244ADGGR` (TI) | Selected for prototype | 16 non-inverting channels, 1.65 V to 3.6 V supply, 5.5 V-tolerant inputs, outputs limited to `VCC`, and no bus-hold. |
-| Three-channel buck | `EA3036CQBR` / EA3036C | Selected for prototype | CH1 is fixed 3.32 V, CH2 is fixed 1.218 V, and CH3 remains the existing schematic-defined external `VIO18` rail. |
+| Three-channel buck | `EA3036CQBR` / EA3036C | Selected for prototype | CH1 is the fixed 3.32-V `3V3` rail, CH2 is the DAC-adjustable external `VIO18` rail, and CH3 is the fixed 1.218-V `1V2` rail. |
 | EA3036C output inductor | `SHC252012-1R5M`, 1.5 uH | Selected for prototype | Correct 1.5 uH value for EA3036C, low DCR, and ample current rating for the specified regulator load. |
 | HD3SS3220 power-good control | `TPS3898ADRYT` | Selected for prototype | Its open drain releases `ENn_CC` to the VDD5 pull-up until the fixed 3.3 V mux rail is valid. |
 | Analog amplifier | `OPA2356` | Conditional | Use only when retaining the high-bandwidth analog capture path. |
@@ -28,11 +28,23 @@ The digital path is `probe -> buffer -> CH32H417 GPIO`. The buffer and capture
 GPIO domain share the product-required external `VIO18` rail. Probe inputs
 support 1.8 V, 2.5 V, 3.3 V, and 5 V logic standards. The project does not
 support 1.2 V probe logic. This document does not prescribe changes to the
-existing CH3 feedback or DAC connection.
+existing CH2 feedback or DAC connection.
 
 The `SN74LVC16244ADGGR` selection meets the hard electrical conditions. It
 requires board validation at each selected external `VIO18` voltage with the
 intended RC/ESD network and actual MCU input loading.
+
+All four active-low `OE#` inputs are tied directly to `GND`. The buffer is
+therefore always enabled when its `VIO18` supply is valid; no `CAPTURE_OE_N`
+net, PB2 assignment, pull-up, or firmware output gate is part of the design.
+TI `SN74LVC16244A` Rev. C, page 11, Section 9.4, Table 3 specifies that
+`OE = L` makes `Y` follow `A`, while `OE = H` makes `Y` high impedance.
+
+When the optional HSADC path is retained, `VDD33A` and `VDDIO` remain on the
+fixed 3.32-V rail. WEU6 has no external `VREFP` pin; its internal `VREFP`
+equals `VDD33A`. The selected capture `VIO18` rail remains 1.80 V, 2.50 V, or
+3.00 V and does not set the HSADC conversion range. See [HSADC and VIO18
+operating constraints](research/ch32h417weu6-hsadc-vio18-constraints.md).
 
 Sources: [TI SN74LVC16244A data sheet](https://www.ti.com/lit/ds/symlink/sn74lvc16244a.pdf),
 [TI product page for the exact ordering code](https://www.ti.com/product/SN74LVC16244A/part-details/SN74LVC16244ADGGR)
@@ -54,12 +66,14 @@ external rail must remain in that range whenever I2C is active. Run I2C2 at
 
 The project-specific peripheral is `VBUS_RAW -> 910 kOhm -> VBUS_DET`,
 `TPS25200 OUT -> VDD5`, and `EA3036C 3.32 V -> VCC33`, with a 200 kOhm
-pull-up from open-drain `DIR` to fixed 3.3 V. All three EA3036C `EN` pins
-connect directly to `VDD5`; TPS25200 `FAULT` remains NC.
+pull-up from open-drain `DIR` to fixed 3.3 V. `EA3036C.EN1` connects directly
+to `VDD5`; `EN2` and `EN3` each use the selected `3V3`-referenced
+`10 kOhm / 100 nF` RC network. TPS25200 `FAULT` remains NC.
 
-This direct EA enable policy is valid for the CH32H417 rails, which have no
-mandatory three-rail sequence. It does not satisfy the separate HD3SS3220
-power-on requirement. `ENn_CC` is therefore controlled by `TPS3898ADRYT`,
+This local passive EA enable policy is valid for the CH32H417 rails, which have
+no mandatory three-rail sequence. The matching EN2/EN3 RC values intentionally
+do not impose a CH2-to-CH3 order, and no MCU, PGOOD, or cascade is selected.
+It does not satisfy the separate HD3SS3220 power-on requirement. `ENn_CC` is therefore controlled by `TPS3898ADRYT`,
 which monitors `VCC33` and releases this active-low input to the VDD5 pull-up
 during ramp. The
 exact divider, delay capacitor, and release test are fixed in
@@ -116,8 +130,6 @@ the existing schematic implementation; see the evidence boundary there.
 
 ## Open Design Decisions
 
-- Reserve WEU6 QFN68 pad `47/PB2` as open-drain `CAPTURE_OE_N`. Its FT input
-  accepts the `VDD5` pull-up used to keep the capture buffer disabled at reset.
 - Freeze the per-channel probe protection and RC values after checking their
   effect on short pulses and input capacitance.
 - Determine whether the analog capture path remains in the compact product.
@@ -131,8 +143,10 @@ the existing schematic implementation; see the evidence boundary there.
   feedback network or startup behavior.
 - Measure short-pulse observability, all-channel relative skew, and ringing at
   the MCU side of the buffer at the 200 MS/s target.
+- With HSADC enabled, verify PC2/PC3 acquisition and its `0 V` to 3.32-V
+  conversion range at each selected `VIO18` mode.
 - Check EA3036C output ripple, startup, thermal rise, and the selected
-  3.32 V / 1.218 V / existing-VIO18 rail budget at realistic loads.
+  3.32-V `3V3` / external-`VIO18` / 1.218-V `1V2` rail budget at realistic loads.
 - Confirm the TPS3898-controlled `ENn_CC` is high during every supply ramp and
   remains high for at least 2 ms after both HD3SS3220 supply rails are valid.
 - Verify `VDD5` remains above 4.5 V at HD3SS3220 and that full-rate capture is

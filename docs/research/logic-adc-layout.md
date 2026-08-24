@@ -25,8 +25,8 @@ requirement.
 | --- | --- |
 | CH32H417 has one HSADC, an analog input range of `VSS` to `VDDIO`, and a 20 MS/s maximum rate. | There is no simultaneous two-ADC timing pair to length-match. Keep each analog path quiet and short instead. |
 | `VDD33A` powers the HSADC analog circuitry and should be at least 3.0 V when HSADC is used. WCH specifies a local 0.1 uF capacitor. | Keep the HSADC analog-supply decoupling at the MCU, with a direct ground return. |
-| `VREFP` is the ADC/HSADC/DAC reference. WCH specifies a local 0.1 uF capacitor and requires `VREFP <= VDD33A`. | Treat `VREFP` as an analog-reference node, not as an ordinary power trace. The capacitor-to-ground loop is more important than trace width. |
-| `VIO18` supplies high-speed I/O; WCH specifies 0.1 uF at each pin and 2.2 uF at the main `VIO18` adjacent to `VDDIO`. | Route the external regulator output to the MCU and buffer separately after its local output capacitor. Keep the buffer bypass local and do not share its return path with switch-node current. |
+| WEU6 does not expose `VREFP` or `VSSA`; WCH defines an unbonded `VREFP` as internally equal to `VDD33A`. HSADC also requires `VDDIO >= VREFP`. | Keep `VDD33A` and `VDDIO` at the same fixed 3.32-V rail. Do not create an external `VREFP` net or capacitor footprint for WEU6. |
+| `VIO18` supplies high-speed I/O; WCH specifies 0.1 uF at each pin and 2.2 uF at the main `VIO18` adjacent to `VDDIO`. | Route the selected external capture voltage to the MCU and buffer separately after its local output capacitor. It may be 1.80 V, 2.50 V, or 3.00 V while `VDD33A` and `VDDIO` remain fixed at 3.32 V. |
 | SN74LVC16244A is a fast CMOS buffer. TI specifies up to 1 ns output skew over -40 C to 85 C and up to 1.5 ns over -40 C to 125 C. | PCB length matching can make board skew negligible, but it cannot eliminate device channel skew. |
 | The OPA2356 data sheet calls for high-frequency layout, a ground plane, short direct traces, and bypassing at `V+`; it specifies 10 uF ceramic as the minimum bypass capacitance. | The OPA supply loop and its output-to-HSADC path must remain local to the analog area. |
 
@@ -64,7 +64,7 @@ impedance from the board fabricator before assigning an impedance value.
 | `CAPTURE_D[15:0]`: buffer output to CH32H417 UHSIF input | 6 mil nominal, all 16 on the same routing layer where possible | Keep the group mismatch at or below 100 mil (2.54 mm), measured from buffer output pad to MCU pad. | Zero signal vias is the target; one is the maximum if unavoidable. Use the same via count and reference-plane topology for every channel. |
 | `AN_HIGH_Z[n]`: the analog amplifier input node after its attenuation/protection network | 6 mil nominal, L1 over L2 ground | No longer than 5 mm; direct route only. | No via, test pad, branch, parallel digital run, or copper from a switch node below it. |
 | `AN_DRV[n]`: OPA2356 output to HSADC input | 6 mil nominal, L1 over L2 ground | Target no longer than 10 mm; 15 mm is the placement limit. | No via, test pad, branch, or length-tuning meander. |
-| `VREFP`, `VDD33A`, OPA supply bypass loops | Use the widest practical copper, not the 6 mil signal class. | Minimize capacitor-to-pin-to-ground-loop area. | Place the ground via at the capacitor ground pad; do not route this return through digital ground current. |
+| `VDD33A` and OPA supply bypass loops | Use the widest practical copper, not the 6 mil signal class. | Minimize capacitor-to-pin-to-ground-loop area. | Place the ground via at the capacitor ground pad; do not route this return through digital ground current. |
 
 Six mil is electrically adequate for all four signal classes above. It is a
 routing/manufacturing width, not a declaration of 50 ohm impedance. The logic
@@ -90,9 +90,11 @@ width without the actual finished stack-up.
 5. Do not compensate a long raw-input route by adding a large serpentined
    output route. Match by component placement and connector pin order first;
    use only broad, well-spaced tuning segments as a last step.
-6. Tie all buffer enable/control inputs to defined states. TI explicitly warns
-   that multi-bit logic inputs must not float. Place at least the local 0.1 uF
-   `VIO18` bypass capacitor at the buffer supply pin with a short ground via.
+6. Tie all four active-low buffer `OE#` inputs directly to `GND`; do not route
+   an OE GPIO. TI `SN74LVC16244A` Rev. C, page 11, Section 9.4, Table 3 defines
+   this as the always-enabled state and its layout guidance warns against
+   floating logic inputs. Place at least the local 0.1 uF `VIO18` bypass
+   capacitor at the buffer supply pin with a short ground via.
 
 Keep each channel's total board copper path within 250 mil (6.35 mm) of the
 others, measured from the equivalent node after its per-channel protection
@@ -121,9 +123,10 @@ capacitance and pickup.
 3. Put the OPA2356 supply bypass directly at its `V+` pin. The data sheet's
    10 uF minimum ceramic bypass is an electrical requirement to carry into the
    schematic and layout; do not replace it with a remote shared bulk capacitor.
-4. Put the WCH-required 0.1 uF capacitors directly at `VDD33A` and `VREFP`.
-   Use a separate, direct return to the uninterrupted L2 ground plane. Keep
-   these capacitor loops out of the buffer and DC/DC return-current paths.
+4. Put the WCH-required 0.1 uF capacitor directly at `VDD33A`. WEU6 has no
+   external `VREFP` or `VSSA` pins, so do not add their generic-package
+   capacitor loops to this PCB. Keep the `VDD33A` capacitor loop out of the
+   buffer and DC/DC return-current paths.
 5. Do not add a capacitor, series resistor, or RC value at the HSADC pin solely
    from a generic layout rule. WCH does not publish the HSADC sampling-capacitor
    or source-impedance requirement needed to justify a numeric value. Freeze
@@ -136,9 +139,11 @@ capacitance and pickup.
   full board-channel copper paths satisfy the 250 mil target.
 - No capture net changes layer; if one must, all affected routes retain the
   same via count and a nearby ground-return via.
-- The buffer has local external `VIO18` bypassing and every OE/control input is defined.
-- `VDD33A` is at least 3.0 V for HSADC operation, `VREFP <= VDD33A`, and their
-  0.1 uF capacitors are at the MCU pins.
+- The buffer has local external `VIO18` bypassing and all four `OE#` pins are
+  tied directly to `GND` (always enabled).
+- `VDD33A` and `VDDIO` are both 3.32 V for HSADC operation; the exposed
+  `VDD33A` pin has its 0.1 uF capacitor at the MCU, and no nonexistent WEU6
+  `VREFP` or `VSSA` capacitor footprint is present.
 - Each OPA2356 has its local 10 uF ceramic bypass, a sub-5 mm high-impedance
   input node, and a no-via output route no longer than 15 mm to its HSADC pin.
 - The 200 MS/s validation plan measures ringing and capture consistency at all
@@ -148,6 +153,7 @@ capacitance and pickup.
 ## Sources
 
 - [Project hardware requirements](project-requirements.md)
+- [HSADC and VIO18 operating constraints](ch32h417weu6-hsadc-vio18-constraints.md)
 - [WCH CH32H417 data sheet](https://www.wch-ic.com/downloads/CH32H417DS0_PDF.html)
 - [WCH UHSIF development reference manual](https://github.com/openwch/ch32h417/blob/main/EVT/EXAM/UHSIF/CH32H417%E9%80%9A%E7%94%A8%E9%AB%98%E9%80%9F%E6%8E%A5%E5%8F%A3%EF%BC%88UHSIF%EF%BC%89%E5%BC%80%E5%8F%91%E5%8F%82%E8%80%83%E6%89%8B%E5%86%8C.pdf)
 - [TI SN74LVC16244A data sheet](https://www.ti.com/lit/ds/symlink/sn74lvc16244a.pdf)

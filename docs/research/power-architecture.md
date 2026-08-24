@@ -13,31 +13,36 @@ VBUS_RAW -- TPS25200DRVR -- VDD5 ------------------------ HD3SS3220.VDD5
                             |                              TPS3898ADRYT.VCC
                             +-- EA3036CQBR VIN1/2/3, VCC
 
-EA3036C CH1: 3.32 V  -> VDD33, VDD33A, VDDIO, VREFP, HD3SS3220.VCC33
-EA3036C CH2: 1.218 V -> VDDK, VDD12A
-EA3036C CH3: existing external VIO18 -> CH32 VIO18, SN74LVC16244A.VCC, I2C pull-ups
+EA3036C CH1: 3V3 (3.32-V target) -> VDD33, VDD33A, VDDIO, HD3SS3220.VCC33
+EA3036C CH2: 1V8 / VIO18 (DAC-adjustable) -> CH32 VIO18, SN74LVC16244A.VCC, I2C pull-ups
+EA3036C CH3: 1V2 (1.218-V target) -> VDDK, VDD12A
 ```
 
 `VIO18` is an externally supplied, DAC-adjustable common capture-voltage
-domain. It directly powers the CH32H417 `VIO18` pins, the 16-channel capture
+domain from CH2. The current PCB names this net `1V8`; that name denotes the
+default mode, not a restriction on the selected 1.80-V, 2.50-V, or 3.00-V
+target. It directly powers the CH32H417 `VIO18` pins, the 16-channel capture
 buffer, and the HD3SS3220 I2C pull-ups. It is never connected to `VDDIO`.
-Its selectable nominal values are 1.80 V, 2.50 V, and 3.00 V. The 3.00-V mode
-is the 3.3-V and 5-V logic mode: SN74LVC16244A has a fixed 2.0-V `VIH(min)`
-when `VCC >= 2.7 V`, so 3.00 V is sufficient and preserves margin below the
-fixed 3.32-V `VDDIO` rail.
+The 3.00-V mode is the 3.3-V and 5-V logic mode: SN74LVC16244A has a fixed
+2.0-V `VIH(min)` when `VCC >= 2.7 V`, so 3.00 V is sufficient and preserves
+margin below the fixed 3.32-V `VDDIO` rail.
 
 ```text
 VDD33 >= VDD33A >= VDDIO >= VIO18
 VDD33A >= VREFP
 ```
 
+WEU6 does not expose `VREFP` or `VSSA`. Its internal `VREFP` is equal to
+`VDD33A`, so `VREFP` is not a separate PCB rail or decoupling location on this
+package.
+
 ## Rail Values and Passives
 
-| Rail | EA3036C feedback network | Nominal output | Allocated load | Loads |
+| Rail | Current EA3036C channel | Nominal output | Allocated load | Loads |
 | --- | --- | ---: | ---: | --- |
-| `VCC33` | `68.0 kOhm / 15.0 kOhm`, 1% | 3.32 V | 0.50 A | CH32 `VDD33`, `VDD33A`, `VDDIO`, `VREFP`; HD3 `VCC33` |
-| `VDD12` | `103 kOhm / 100 kOhm`, 1% | 1.218 V | 0.45 A | CH32 `VDDK`, `VDD12A` |
-| `VIO18` | Existing schematic-defined external rail | Product-defined | 0.60 A | CH32 `VIO18`, SN74LVC16244A, I2C pull-ups |
+| `3V3` / `VCC33` | CH1 | 3.32 V | 0.50 A | CH32 `VDD33`, `VDD33A`, `VDDIO`; HD3 `VCC33` |
+| `1V8` / `VIO18` | CH2, including the existing DAC2 feedback connection | Product-defined | 0.60 A | CH32 `VIO18`, SN74LVC16244A, I2C pull-ups |
+| `1V2` / `VDD12` | CH3 | 1.218 V | 0.45 A | CH32 `VDDK`, `VDD12A` |
 
 Fit the following EA3036C network:
 
@@ -48,21 +53,53 @@ Fit the following EA3036C network:
 | Each output | `22 uF`, X5R/X7R; effective capacitance must remain at least 10 uF at bias |
 | Each `VOUTx -> FBx` | `220 pF`, C0G/X7R, in parallel with the upper feedback resistor |
 | Each channel inductor | `SHC252012-1R5M`, 1.5 uH |
-| `EN1`, `EN2`, `EN3` | Directly to `VDD5`; no RC components |
+| `EN1` | Directly to `VDD5` |
+| `EN2` | `3V3 -> R5 (10 kOhm) -> EN2`, with `C15 (100 nF)` from EN2 to GND |
+| `EN3` | `3V3 -> R6 (10 kOhm) -> EN3`, with `C16 (100 nF)` from EN3 to GND |
 
-All EA3036C enable pins remain directly connected to `VDD5`. CH32H417 does
-not specify an ordered startup of these three rails. The EA3036C RC shown in
-the data sheet is an optional delay circuit and is not fitted here.
+The selected enable topology is therefore:
+
+```text
+VDD5 ------------------------------ EN1
+3V3 --- R5 10 kOhm ---+------------ EN2
+                       |
+                     C15 100 nF
+                       |
+                      GND
+3V3 --- R6 10 kOhm ---+------------ EN3
+                       |
+                     C16 100 nF
+                       |
+                      GND
+```
+
+Using `3V3`, rather than `VDD5`, as the source for both delayed enables makes
+CH2 and CH3 wait for CH1's rail to begin rising. Equal RC networks intentionally
+do not impose a CH2-to-CH3 order. No MCU GPIO, power-good signal, or CH2-to-EN3
+cascade is part of this design.
+
+The nominal RC time constant of each delayed enable is `1 ms`. EA3036C
+Ver. 1.4, page 11, Section "Enable Control" says that each channel's startup
+time can be programmed with an independent EN RC and illustrates `100 kOhm`
+with `10 nF` to `100 nF`. Its page 5 electrical table gives only
+`V_EN-L <= 0.4 V` and `V_EN-H >= 1.4 V`; it does not give an EN-threshold upper
+bound, EN input timing parameters, or a guaranteed EN-to-output-stable time.
+Consequently, `10 kOhm x 100 nF = 1 ms` records the nominal circuit constant,
+not an official guarantee that `3V3` is fully settled before CH2 or CH3 turns
+on. WCH specifies no mandatory three-rail order, so no additional sequence
+circuit is selected.
 
 ## External VIO18 Evidence Boundary
 
-External `VIO18` is a product requirement. The CH32H417 data sheet documents
-the internal I/O LDO and its software-off mode, but does not publish an
-external-regulator application circuit, PA5 reset-state electrical guarantee,
-or an external/internal-LDO handover procedure. Therefore this document does
-not prescribe an `XO` resistor, a CH3 feedback network, or a DAC startup
-sequence. Keep the existing `VIO18` net name and CH3 feedback circuit unless a
-separate official WCH source establishes a required change.
+External `VIO18` is a product requirement. WCH-RM v1.7 proves PA5 resets as
+a floating GPIO input and DAC2 resets disabled, but the WCH data sheet and
+reference manual only document external `VIO18` when it is fixed shorted to
+`VDDIO`. They do not publish an independent-external-LDO application circuit
+or a handover procedure for this DAC-adjustable rail. Therefore this document
+does not prescribe an `XO` resistor, a CH2 feedback network, or a DAC startup
+sequence. Keep the existing `VIO18` net name and CH2 feedback circuit unless a
+separate official WCH source establishes a required change. See [the official
+analysis](ch32h417-external-vio18-dac-control-official-analysis.md).
 
 ## CH32H417 Supply Rules
 
@@ -70,10 +107,15 @@ separate official WCH source establishes a required change.
 - `VDD12` is within the 1.17-1.27-V range. Its 1.218-V target leaves 18 mV
   above 1.2 V for copper drop.
 - `VIO18` is externally supplied by product requirement and must not exceed
-  `VDDIO`. The exact external control range and startup behavior are not frozen
-  in this document because WCH has not published the required interface proof.
+  `VDDIO`. WCH documents only a fixed `VDDIO`--`VIO18` short, not this
+  independent external control range or startup behavior.
+- With HSADC enabled, keep `VDD33A = VDDIO = 3.32 V`. WEU6's internal
+  `VREFP` then also equals 3.32 V, while `VIO18` remains at the selected
+  1.80-V, 2.50-V, or 3.00-V capture voltage. The HSADC conversion range stays
+  at `0 V` to `VDDIO`; it does not follow `VIO18`. See [HSADC and VIO18
+  operating constraints](ch32h417weu6-hsadc-vio18-constraints.md).
 - Keep the CH32 combined `VDDIO` and `VIO18` supply-pin current below its
-  200-mA absolute maximum. The 0.60-A CH3 allocation is rail capacity for the
+  200-mA absolute maximum. The 0.60-A CH2 allocation is rail capacity for the
   buffer and associated loads; it is not permission to draw 0.60 A through MCU
   supply pins.
 
@@ -83,16 +125,17 @@ or initializing USB 3.0. Use a 20-ms first-board guard before that call.
 
 ### Capture Output Enable
 
-Tie all four active-low `OE` inputs of SN74LVC16244A to `CAPTURE_OE_N`. Pull
-that net up to `VDD5` through `47 kOhm`; connect it to WEU6 QFN68 pad 47,
-`PB2`, configured as an open-drain GPIO. WCH identifies PB2 as a
-VDDIO-supplied FT pin, so the 5-V pull-up is valid while the MCU is unpowered.
-During reset and every `VIO18` transition PB2 is high impedance and buffer
-outputs are disabled. Firmware drives PB2 low only after external `VIO18` has
-settled at its selected voltage.
+Tie all four active-low `OE#` inputs of SN74LVC16244A directly to `GND`. The
+buffer is always enabled when its `VIO18` supply is valid; the current design
+contains no `CAPTURE_OE_N` net, PB2 assignment, pull-up, or firmware-controlled
+output gate.
 
-This uses one resistor and no new active device. Do not substitute a
-high-speed `VIO18` pin or a non-FT pin for `CAPTURE_OE_N`.
+TI `SN74LVC16244A` Rev. C, page 11, Section 9.4, Table 3 states that
+`OE = L` makes `Y` follow `A`, while `OE = H` makes `Y` high impedance. A
+direct GND connection is therefore the defined always-enabled state, not an
+undefined reset state. The buffer and capture GPIOs share the external
+`VIO18` rail; this connection neither drives an MCU output nor changes the
+separate WCH external-`VIO18` handover evidence boundary.
 
 ## TPS25200DRVR Power Path
 
@@ -159,8 +202,8 @@ the HD3SS3220 enable network.
 2. Verify the finalized external `VIO18` circuit against an official WCH
    application document before assigning a startup or transition procedure.
    Do not infer PA5 reset behavior from the DAC driver API.
-3. Verify buffer outputs remain disabled during reset and each specified
-   `VIO18` transition, and test the required capture thresholds.
+3. Test the required capture thresholds at each selected external `VIO18`
+   voltage with all buffer `OE#` pins permanently tied to `GND`.
 4. At HD3SS3220 pins, verify `VDD5 >= 4.5 V`, VDD5 ramp no slower than 25 ms,
    and `ENn_CC` remains at least `VDD5 - 0.3 V` until both rails are stable,
    then remains high at least 2 ms before dropping below 0.4 V.
