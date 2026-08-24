@@ -12,8 +12,9 @@
   handover, PA5 reset behavior, or new CH3 feedback values. This requirement
   therefore does not authorize changing the existing VIO18 schematic.
 - The probe-side path must stay high impedance. It includes RC filtering, ESD,
-  and electronic-fuse protection. The stated 50-ohm goal is controlled trace
-  impedance, not a 50-ohm input termination requirement.
+  and electronic-fuse protection. It has no 50-ohm input-termination
+  requirement; any controlled-impedance target must be verified against the
+  finished board stack-up.
 - The compact layout target retains less than 50 mil channel-length mismatch.
 
 ## Digital Buffer Requirements
