@@ -11,6 +11,9 @@
   voltage-domain, and layout constraints.
 - [CH32H417 Package Comparison](research/ch32h417-package-comparison.md):
   hardware comparison of WEU6 and QEU6 and the reason WEU6 is selected.
+- [CH32H417QEU6 Reference Power Topology](research/ch32h417-qeu6-reference-power-topology.md):
+  supplied-reference analysis of the `AVCC`/`VDD33A`/`VREFP`/`VDDIO` path,
+  the L4 ferrite-bead boundary, and the required HSADC validation.
 - [Analog Front End](research/analog-front-end.md): OPA2356 and OPA2365
   comparison for the optional analog capture path.
 - [EA3036C Inductor Selection](research/ea3036-inductor.md): rationale for
