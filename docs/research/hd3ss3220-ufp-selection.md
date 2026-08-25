@@ -25,7 +25,7 @@ negotiation.
 | VBUS sense | One `910 kOhm`, 1% resistor from `VBUS_RAW` to `VBUS_DET` | `VBUS_RAW` is the connector VBUS node before TPS25200. The pin senses 4 V to 28 V through this resistor; it is not a VBUS supply input. |
 | 5 V supply | `VDD5` from `VBUS_5V_PROTECTED` | This is the TPS25200 output and must be 4.5 V to 5.5 V. |
 | 3.3 V supply | `VCC33` from the EA3036C fixed 3.3 V output | Required range is 3.0 V to 3.6 V. |
-| CC controller enable | `TPS3898ADRYT.SENSE_OUT` drives `ENn_CC`; add the selected 12 kOhm pull-up from `VDD5` and the supervisor's `VCC33` divider/CT network. | This implements the HD3SS3220 controlled-enable condition without altering the direct EA3036C enable policy. |
+| CC controller enable | `TPS3898ADRYT.SENSE_OUT` drives `ENn_CC`; add the selected 12 kOhm pull-up from `VDD5` and the supervisor's `VCC33` divider/CT network. | This implements the HD3SS3220 controlled-enable condition without altering the local EA3036C enable policy (`EN1` direct; `EN2`/`EN3` from `3V3` RC). |
 | Mux enable | Hold `ENn_MUX` low in normal operation | Enables the SuperSpeed mux. A permanently enabled port may tie it to GND. |
 | Orientation status | Pull `DIR` up to `VCC33` with 200 kOhm | `DIR` is open drain and TI specifies this pull-up for proper operation. No MCU handling is needed for mux orientation. |
 | Source-current selector | `CURRENT_MODE` NC | It is a don't-care input in UFP mode. |

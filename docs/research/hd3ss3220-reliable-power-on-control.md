@@ -33,7 +33,9 @@ output is only specified at `0.8 x VCC`. Do not fit TPS3896 in this circuit.
 
 ## Unchanged Decisions
 
-- All EA3036C `EN` pins connect directly to `VDD5`.
+- EA3036C enable timing remains local: `EN1` connects to `VDD5`; `EN2` and
+  `EN3` use separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No MCU,
+  FAULT, or HD3SS3220 control pin connects to them.
 - TPS25200 `FAULT` remains NC.
 - No controller `FAULT` or `EN` pin connects to another controller.
 - `VDD5` must ramp at the HD3SS3220 pin in 25 ms or less. The supervisor does

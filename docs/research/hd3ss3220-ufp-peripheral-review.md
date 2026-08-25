@@ -67,10 +67,11 @@ VDD5 is stable for at least 2 ms before VCC33 reaches its valid level.
 ```
 
 For this project, `VDD5` is `VBUS_5V_PROTECTED`, the TPS25200 output. `VCC33`
-is the EA3036C fixed 3.3 V output. All three EA3036C `EN` pins connect directly
-to `VBUS_5V_PROTECTED`; no EA EN RC network is used. This is the correct
-always-on policy for the CH32H417 rails, but the EA3036C data sheet gives no
-maximum start-up timing that proves the 2 ms HD3SS3220 requirement.
+is the EA3036C fixed 3.3 V output. `EN1` connects to `VBUS_5V_PROTECTED`;
+`EN2` and `EN3` each use a `3V3`-referenced `10 kOhm / 100 nF` RC network.
+This is the correct always-on policy for the CH32H417 rails, but the EA3036C
+data sheet gives no maximum start-up timing that proves the 2 ms HD3SS3220
+requirement.
 
 Consequently, this project uses TI's controlled `ENn_CC` method rather than a
 permanent GND connection. `TPS3898ADRYT` releases the input to its VDD5
@@ -135,8 +136,16 @@ Board 3.3 V ------------------------- U1.VCC33
 U1.VCC33 -- C2 100 nF -------------- GND
 
 VBUS_5V_PROTECTED -------------------- EA3036C EN1
-VBUS_5V_PROTECTED -------------------- EA3036C EN2
-VBUS_5V_PROTECTED -------------------- EA3036C EN3
+3V3 ---- R5 10 kOhm ----+------------- EA3036C EN2
+                          |
+                        C15 100 nF
+                          |
+                         GND
+3V3 ---- R6 10 kOhm ----+------------- EA3036C EN3
+                          |
+                        C16 100 nF
+                          |
+                         GND
 
 U1.PORT ----------------------------- GND
 U1.ADDR ----------------------------- GND (I2C 7-bit address 0x47)
