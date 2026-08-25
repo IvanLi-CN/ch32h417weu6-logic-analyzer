@@ -12,3 +12,4 @@
   constraints, and the pin-level validation boundary.
 - [CH32H417WEU6 外部 VIO18 复位行为与 EA3036C 使能策略](ch32h417-vio18-en-gated-dac-assessment.md): WCH 官方资料证明 PA5/DAC2 的高阻复位状态；当前 EN2/EN3 使用 `3V3` RC，不采用 MCU、PGOOD 或级联控制。
 - [SN74LVC16244A 输入网络与 200 MS/s 评估](sn74lvc16244a-input-network-200mhz.md): 当前 1.8-V 输入网络的 `OE#` 直接接地、弱下拉、串联阻尼、ESD 与采样边界。
+- [LMHaley CH32H417 USB3.0 逻辑分析仪采集记录](oshwhub-aaahaley-ch32h417-usb3-logic-analyzer.md): 改进版工程的页面资料、软件与硬件改动、评论和复用边界。
