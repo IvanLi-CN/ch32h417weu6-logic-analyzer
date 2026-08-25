@@ -18,7 +18,7 @@ matching a reference board's component names or propagation-delay values.
 | EA3036C output inductor | `SHC252012-1R5M`, 1.5 uH | Selected for prototype | Correct 1.5 uH value for EA3036C, low DCR, and ample current rating for the specified regulator load. |
 | HD3SS3220 power-good control | `TPS3898ADRYT` | Selected for prototype | Its open drain releases `ENn_CC` to the VDD5 pull-up until the fixed 3.3 V mux rail is valid. |
 | Analog amplifier | `OPA2356` | Conditional | Use only when retaining the high-bandwidth analog capture path. |
-| Future hardware SPI expansion | `SPI1`: PF4/NSS, PF5/SCK, PD7/MOSI, PF3/MISO | Reserved | A complete AF5 full-duplex port remains free, with adjacent PD6 reserved as optional expansion GPIO. It uses the selected external `VIO18` logic domain. |
+| Future hardware SPI expansion | `SPI1` candidate: PF4/NSS, PF5/SCK, PD7/MOSI, PF3/MISO | Fallback only | The baseline board includes no SPI expansion interface or GPIO reservation. The candidate remains documented for a future board and requires renewed conflict checking. |
 
 ## Electrical Basis
 
@@ -89,21 +89,23 @@ for the complete connection constraints and BOM.
 Sources: [TI HD3SS3220 data sheet](https://www.ti.com/lit/ds/symlink/hd3ss3220.pdf)
 and [WCH CH32H417 data sheet](https://www.wch-ic.com/downloads/CH32H417DS0_PDF.html)
 
-### Future Hardware SPI Expansion
+### Candidate Hardware SPI Expansion
 
-Reserve a full `SPI1` port for future hardware expansion: `PF4` as NSS/CS0,
-`PF5` as SCK, `PD7` as MOSI, and `PF3` as MISO, all in AF5. Reserve adjacent
-`PD6` as `EXP_GPIO0` for a peripheral interrupt, reset, or extra software
-chip-select. These are all `VIO18` pins, so the expansion interface uses the
-currently selected external capture-I/O domain; it is not a fixed 3.3 V or 5 V
-port.
+`SPI1` is retained only as a future fallback candidate: `PF4` as NSS/CS0,
+`PF5` as SCK, `PD7` as MOSI, and `PF3` as MISO, all in AF5; `PD6` is the
+candidate `EXP_GPIO0` for an interrupt, reset, or extra software chip-select.
+The baseline board does not reserve those pins or include an SPI FPC connector,
+connector footprint, test pads, named expansion nets, or routes.
 
-The reservation requires only PCB access to `GND`, `VIO18`, the four SPI nets,
-and `EXP_GPIO0`. Do not fit a connector or additional components until a
-specific expansion device and its power budget are selected. The MCU SPI limit
-is 75 MHz, subject to board-level validation for the actual future topology.
-See [hardware SPI expansion reservation](research/spi-expansion-allocation.md)
-for the pin, electrical, and firmware constraints.
+If a future board adopts this candidate, its planned 8-pin FPC allocation is
+`GND`, `3V3`, `VIO18`, the four SPI nets, and `EXP_GPIO0`. The SPI signals are
+in the variable `VIO18` domain; fixed `3V3` (the `VCC33` rail, nominal `3.32
+V`) is auxiliary power only and does not make the SPI port a fixed-3.3-V or
+5-V logic interface. Revalidate pin conflicts, power budget, electrical
+compatibility, and routing before implementation. The MCU SPI limit is 75 MHz,
+subject to board-level validation for the actual future topology. See
+[candidate hardware SPI expansion](research/spi-expansion-allocation.md) for
+the pin, electrical, and firmware constraints.
 
 ### Power and Inductor
 
@@ -163,5 +165,5 @@ the existing schematic implementation; see the evidence boundary there.
 - [EA3036C inductor selection](research/ea3036-inductor.md)
 - [Power architecture](research/power-architecture.md)
 - [HD3SS3220 fixed-UFP peripheral review](research/hd3ss3220-ufp-peripheral-review.md)
-- [Hardware SPI expansion reservation](research/spi-expansion-allocation.md)
+- [Candidate SPI expansion](research/spi-expansion-allocation.md)
 - [Analog front-end choice](research/analog-front-end.md)
