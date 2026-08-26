@@ -1,6 +1,17 @@
 # HD3SS3220 Reliable Power-On Control
 
-## Selected Circuit
+## Scope
+
+This document records an alternative circuit for a future board that requires
+component-specification timing closure. It is **not** the current netlist:
+the current design ties `HD3SS3220.ENn_CC` to GND and delays the EA3036C main
+3.3-V enable through protected 5 V, `100 kOhm`, and `1 uF`.
+
+That passive path must be qualified by measuring the controller's `VDD5`,
+`VCC33`, and `ENn_CC` pins. It is not interchangeable with the monitor circuit
+below, and this document is not a BOM instruction for the current board.
+
+## Alternative Circuit
 
 Use `TPS3898ADRYT`, not `TPS3896ADRYT`, to control `HD3SS3220.ENn_CC`.
 
@@ -31,15 +42,16 @@ This closes the high-level requirement that TPS3896 could not close:
 HD3SS3220 requires `ENn_CC >= VDD5 - 0.3 V`, while a TPS3896 push-pull high
 output is only specified at `0.8 x VCC`. Do not fit TPS3896 in this circuit.
 
-## Unchanged Decisions
+## Relation to the Current Netlist
 
-- EA3036C enable timing remains local: `EN1` connects to `VDD5`; `EN2` and
-  `EN3` use separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No MCU,
-  FAULT, or HD3SS3220 control pin connects to them.
+- EA3036C enable timing remains local: `EN1` is driven from protected `VDD5`
+  through `100 kOhm`, with `1 uF` from `EN1` to GND; `EN2` and `EN3` use
+  separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No MCU, FAULT, or
+  HD3SS3220 control pin connects to them.
 - TPS25200 `FAULT` remains NC.
 - No controller `FAULT` or `EN` pin connects to another controller.
 - `VDD5` must ramp at the HD3SS3220 pin in 25 ms or less. The supervisor does
-  not remove that requirement.
+  not remove that requirement when this alternative circuit is fitted.
 
 ## Measurement Gate
 

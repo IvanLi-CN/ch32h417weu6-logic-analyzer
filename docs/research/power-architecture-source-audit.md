@@ -13,8 +13,8 @@ schematic, firmware, BOM, or layout as design evidence.
 | Core/USB3 rail | WCH specifies `VDDK`/`VDD12A = 1.17-1.27 V` and recommends external 1.2 V plus 10-50 mV. | EA3036C CH3 / `1.218 V` supplies both. |
 | Capture-voltage architecture | Product requirement mandates external `VIO18`; WCH permits `VIO18 = 1.1-3.6 V` provided it does not exceed `VDDIO`. TI specifies SN74LVC16244A operation at 1.65-3.6 V with 5.5-V-tolerant inputs. | EA3036C CH2 supplies the external VIO18 rail; this document does not prescribe its CH2 feedback values or control range. |
 | Reset-time VIO18 control | WCH specifies the `XO` resistor range selecting the internal-LDO reset default and documents an LDO-off software mode. WCH-RM v1.7 also proves PA5 resets as a floating input and DAC2 resets disabled, but does not publish external-supply handover circuitry. | No `XO` value or DAC/CH2 startup sequence is selected from these sources. |
-| TPS25200 current limit | TI's worst-case equations with a 1% resistor give approximately 1.175-1.420 A for 75 kOhm. | Use common E24 `75 kOhm`; do not use 68 kOhm because its worst-case limit exceeds 1.5 A. Normal full-capture budget is `<= 1.10 A`. |
-| HD3SS3220 enable | HD3 requires a VDD5-referenced high `ENn_CC`; TPS3896 has push-pull output while TPS3898 has an 18-V-rated open drain and the needed active-low-enable polarity. | Use `TPS3898ADRYT` plus a 12-kOhm VDD5 pull-up. |
+| TPS25200 current limit | TI's worst-case equations with a 1% resistor give approximately 1.175-1.420 A for 75 kOhm. | The current netlist uses common E24 `75 kOhm`; do not use 68 kOhm because its worst-case limit exceeds 1.5 A. This threshold does not establish a guaranteed whole-board power budget; board load must be measured. |
+| HD3SS3220 enable | HD3 permits direct-low `ENn_CC` only when VDD5 is stable at least 2 ms before VCC33 is valid. | The current netlist ties `ENn_CC` to GND and delays the main 3.3-V EN through `100 kOhm / 1 uF`; verify the required timing at the controller pins. TPS3898ADRYT is an unpopulated alternative for a future timing-guaranteed design. |
 
 ## Important Boundaries
 

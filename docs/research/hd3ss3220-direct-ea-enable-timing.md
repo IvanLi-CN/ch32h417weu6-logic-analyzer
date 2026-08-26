@@ -2,10 +2,11 @@
 
 ## Decision Boundary
 
-EA3036C `EN1` connects directly to `VBUS_5V_PROTECTED`, the TPS25200 protected
-output. `EN2` and `EN3` each use a local `3V3`-referenced `10 kOhm / 100 nF`
-RC network. This is the selected always-on policy for the three CH32H417 rails:
-CH1 begins from the protected input and the other two channels are passively
+EA3036C `EN1` is driven from `VBUS_5V_PROTECTED`, the TPS25200 protected
+output, through `100 kOhm`, with `1 uF` from EN1 to GND. `EN2` and `EN3` each
+use a local `3V3`-referenced `10 kOhm / 100 nF` RC network. This is the
+selected always-on policy for the three CH32H417 rails: CH1 is passively
+delayed from the protected input and the other two channels are passively
 released after `3V3` starts rising. There is no TPS25200/EA3036C `FAULT` or
 `EN` connection to an HD3SS3220 enable pin.
 
@@ -31,14 +32,14 @@ supplies are stable. `ENn_CC` is active low.
 
 EA3036C specifies that an EN RC can program startup time, but does not specify
 an EN-threshold upper bound or a maximum EN-to-output-stable time that proves
-the required 2 ms interval. The selected `3V3`-referenced RC networks therefore
-do not by themselves justify `ENn_CC -> GND`.
+the required 2 ms interval. The selected EN1 RC therefore does not by itself
+justify `ENn_CC -> GND`.
 
-The EA EN RC topology is selected for the CH1-first board-rail policy, not as
-evidence for the HD3SS3220 timing requirement. The project selects TI's
-controlled-`ENn_CC` sequence through `TPS3898ADRYT`: its open drain releases
-`ENn_CC` to the VDD5 pull-up while the rail is invalid, then sinks it low after
-its delay. The exact circuit and acceptance measurement are in
+The EA EN RC topology is selected for startup separation, not as a
+component-specification proof of the HD3SS3220 timing requirement. The current
+netlist retains `ENn_CC -> GND`; it must be qualified at the HD3SS3220 pins for
+all required power events. A controlled `ENn_CC` sequence through TPS3898ADRYT
+is documented as an unpopulated alternative in
 [HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md).
 
 This is independent of the CH32H417 power-rail order, for which no fixed

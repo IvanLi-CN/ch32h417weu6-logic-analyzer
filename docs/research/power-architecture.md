@@ -10,7 +10,6 @@ implementation as design evidence.
 USB-C VBUS
     |
 VBUS_RAW -- TPS25200DRVR -- VDD5 ------------------------ HD3SS3220.VDD5
-                            |                              TPS3898ADRYT.VCC
                             +-- EA3036CQBR VIN1/2/3, VCC
 
 EA3036C CH1: 3V3 (3.32-V target) -> VDD33, VDD33A, VDDIO, HD3SS3220.VCC33
@@ -53,14 +52,18 @@ Fit the following EA3036C network:
 | Each output | `22 uF`, X5R/X7R; effective capacitance must remain at least 10 uF at bias |
 | Each `VOUTx -> FBx` | `220 pF`, C0G/X7R, in parallel with the upper feedback resistor |
 | Each channel inductor | `SHC252012-1R5M`, 1.5 uH |
-| `EN1` | Directly to `VDD5` |
+| `EN1` | `VDD5 -> 100 kOhm -> EN1`, with `1 uF` from EN1 to GND |
 | `EN2` | `3V3 -> R5 (10 kOhm) -> EN2`, with `C15 (100 nF)` from EN2 to GND |
 | `EN3` | `3V3 -> R6 (10 kOhm) -> EN3`, with `C16 (100 nF)` from EN3 to GND |
 
 The selected enable topology is therefore:
 
 ```text
-VDD5 ------------------------------ EN1
+VDD5 --- 100 kOhm ---+-------------- EN1
+                    |
+                  1 uF
+                    |
+                   GND
 3V3 --- R5 10 kOhm ---+------------ EN2
                        |
                      C15 100 nF
@@ -141,59 +144,38 @@ separate WCH external-`VIO18` handover evidence boundary.
 
 | Item | Value / connection |
 | --- | --- |
-| `IN` bypass | `0.1 uF`, 50 V X7R at IN-GND, plus `10 uF`, 25 V X5R/X7R local bulk |
+| `IN` bypass | Current netlist: `0.1 uF` plus `1 uF` at IN-GND |
 | `OUT` bypass | `22 uF`, 16 V X5R/X7R at OUT-GND |
 | `RILIM` | `75 kOhm`, 1%, 0603, direct to local ground |
-| `EN` | `300 kOhm`, 1%, from `VBUS_RAW` to EN |
+| `EN` | `330 kOhm`, 5%, from `VBUS_RAW` to EN |
 | `FAULT` | NC |
 | Input TVS | Keep a DNP footprint on `VBUS_RAW`; do not populate it by default for a compliant 5-V host |
 
 `75 kOhm` is an E24 common resistance value. With TI's equation and a 1%
-resistor it gives an approximately `1.175-1.420 A` limit. The maximum remains
-below the 1.5-A Type-C Medium advertisement. Its lower guaranteed limit sets
-the normal full-capture design budget to `1.10 A` maximum; `1.15 A` is not an
-acceptable operating target. The previous `68 kOhm` selection is rejected
-because its maximum limit is 1.561 A.
+resistor it gives an approximately `1.175-1.420 A` limit. This is a switch
+protection threshold, not a guaranteed whole-board input-power budget: the
+published MCU domain currents, buck efficiency limit, dynamic buffer load, and
+analog output load do not permit a defensible single maximum input-current
+number for the target firmware. Full capture must remain disabled until
+HD3SS3220 reports Medium or High source current, and the assembled board load
+must be measured before assigning a product current limit.
 
-```text
-3.32 V x 0.50 A + 1.218 V x 0.45 A + 3.00 V x 0.60 A = 4.01 W
-```
+## HD3SS3220 Power-On Boundary
 
-At 4.65 V and 80% conversion efficiency, the buck input is about 1.08 A.
-Reserve **1.10 A maximum normal full-capture input current** after including
-direct 5-V loads and board loss. Full capture must remain disabled until
-HD3SS3220 reports Medium or High source current.
+The current netlist ties `HD3SS3220.ENn_CC` directly to GND. TI permits this
+only when `VDD5` is stable at least 2 ms before `VCC33` reaches a valid level.
+The current `VDD5 -> 100 kOhm -> EN1` and `EN1 -> 1 uF -> GND` network delays
+the main 3.3-V channel, but EA3036C does not publish the EN threshold,
+hysteresis, and output-start-time bounds required to prove that condition over
+all tolerance, temperature, and power events. It is a prototype path that
+requires IC-pin measurement, not a specification guarantee.
 
-## HD3SS3220 Power-On Control
-
-Use `TPS3898ADRYT`, not `TPS3896ADRYT`:
-
-```text
-VDD5 -------------------------- TPS3898ADRYT.VCC
-GND --------------------------- TPS3898ADRYT.GND, ENABLE_N
-VDD5 -- 0.1 uF ---------------- GND
-
-VCC33 -- 422 kOhm, 0.1% --+---- SENSE
-                           |
-                         82.5 kOhm, 0.1%
-                           |
-                          GND
-
-CT -- 47 nF X7R --------- GND
-VDD5 -- 12 kOhm, 1% -----+---- HD3SS3220.ENn_CC
-SENSE_OUT (open drain) --+
-```
-
-TPS3898A has the required active-low-enable timing polarity and an open-drain
-`SENSE_OUT`. Below the 3.02-3.09-V `VCC33` threshold, the output is high
-impedance and the 12-kOhm resistor establishes `ENn_CC = VDD5`. After `VCC33`
-is good, the 47-nF capacitor gives about 190 ms typical delay before it sinks
-`ENn_CC` low. The 12-kOhm pull-up demands 0.458 mA at 5.5 V.
-
-TPS3896 is not valid here: its push-pull high output cannot meet HD3SS3220's
-`ENn_CC >= VDD5 - 0.3 V` requirement. `HD3SS3220.VDD5` must still ramp in
-25 ms or less. TPS25200 `FAULT` and all EA3036C `EN` pins do not connect to
-the HD3SS3220 enable network.
+`TPS25200.FAULT` and all EA3036C `EN` pins remain disconnected from the
+HD3SS3220 enable input. An open-drain monitor circuit is documented in
+[HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md)
+as an unpopulated alternative if a future board requires
+component-specification timing closure. `HD3SS3220.VDD5` must still ramp in
+25 ms or less in either topology.
 
 ## Required First-Board Measurements
 
@@ -205,8 +187,8 @@ the HD3SS3220 enable network.
 3. Test the required capture thresholds at each selected external `VIO18`
    voltage with all buffer `OE#` pins permanently tied to `GND`.
 4. At HD3SS3220 pins, verify `VDD5 >= 4.5 V`, VDD5 ramp no slower than 25 ms,
-   and `ENn_CC` remains at least `VDD5 - 0.3 V` until both rails are stable,
-   then remains high at least 2 ms before dropping below 0.4 V.
+   and the direct-GND enable condition: `VDD5` is stable at least 2 ms before
+   `VCC33` becomes valid, for cold start, hot plug, brownout, and cable removal.
 5. Measure VDD5 current, TPS25200/EA3036C temperature, and `VIO18` ripple at
    all-channel switching load. Normal full-capture input current must stay
    below 1.10 A.

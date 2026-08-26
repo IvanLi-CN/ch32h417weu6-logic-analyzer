@@ -16,7 +16,7 @@ matching a reference board's component names or propagation-delay values.
 | Digital input buffer | `SN74LVC16244ADGGR` (TI) | Selected for prototype | 16 non-inverting channels, 1.65 V to 3.6 V supply, 5.5 V-tolerant inputs, outputs limited to `VCC`, and no bus-hold. |
 | Three-channel buck | `EA3036CQBR` / EA3036C | Selected for prototype | CH1 is the fixed 3.32-V `3V3` rail, CH2 is the DAC-adjustable external `VIO18` rail, and CH3 is the fixed 1.218-V `1V2` rail. |
 | EA3036C output inductor | `SHC252012-1R5M`, 1.5 uH | Selected for prototype | Correct 1.5 uH value for EA3036C, low DCR, and ample current rating for the specified regulator load. |
-| HD3SS3220 power-good control | `TPS3898ADRYT` | Selected for prototype | Its open drain releases `ENn_CC` to the VDD5 pull-up until the fixed 3.3 V mux rail is valid. |
+| HD3SS3220 startup handling | Passive main-3.3-V enable delay | Current netlist | Protected 5 V drives EA3036C EN1 through `100 kOhm`, with `1 uF` to GND; `ENn_CC` is tied to GND and requires prototype timing measurement. |
 | Analog amplifier | `OPA2356` | Conditional | Use only when retaining the high-bandwidth analog capture path. |
 | Future hardware SPI expansion | `SPI1` candidate: PF4/NSS, PF5/SCK, PD7/MOSI, PF3/MISO | Fallback only | The baseline board includes no SPI expansion interface or GPIO reservation. The candidate remains documented for a future board and requires renewed conflict checking. |
 
@@ -66,23 +66,29 @@ external rail must remain in that range whenever I2C is active. Run I2C2 at
 
 The project-specific peripheral is `VBUS_RAW -> 910 kOhm -> VBUS_DET`,
 `TPS25200 OUT -> VDD5`, and `EA3036C 3.32 V -> VCC33`, with a 200 kOhm
-pull-up from open-drain `DIR` to fixed 3.3 V. `EA3036C.EN1` connects directly
-to `VDD5`; `EN2` and `EN3` each use the selected `3V3`-referenced
-`10 kOhm / 100 nF` RC network. TPS25200 `FAULT` remains NC.
+pull-up from open-drain `DIR` to fixed 3.3 V. `EA3036C.EN1` is driven from
+protected `VDD5` through `100 kOhm`, with `1 uF` from EN1 to GND; `EN2` and
+`EN3` each use the selected `3V3`-referenced `10 kOhm / 100 nF` RC network.
+TPS25200 `FAULT` remains NC.
 
-This local passive EA enable policy is valid for the CH32H417 rails, which have
-no mandatory three-rail sequence. The matching EN2/EN3 RC values intentionally
-do not impose a CH2-to-CH3 order, and no MCU, PGOOD, or cascade is selected.
-It does not satisfy the separate HD3SS3220 power-on requirement. `ENn_CC` is therefore controlled by `TPS3898ADRYT`,
-which monitors `VCC33` and releases this active-low input to the VDD5 pull-up
-during ramp. The
-exact divider, delay capacitor, and release test are fixed in
-[Power Architecture](research/power-architecture.md). `HD3SS3220` is not a
-USB PD protocol controller, which matches the current 5 V host-powered
+This local passive EA enable policy has no mandatory CH32H417 three-rail
+sequence: the matching EN2/EN3 RC values intentionally do not impose a
+CH2-to-CH3 order, and no MCU, PGOOD, or cascade is selected. For HD3SS3220,
+the current netlist ties `ENn_CC` directly to GND; TI permits that only when
+protected `VDD5` is stable at least 2 ms before `VCC33` becomes valid. The
+current RC network is a prototype path and must be checked at the controller
+pins during cold start, hot plug, brownout, and cable removal. It is not a
+component-specification timing proof. The monitor circuit documented in
+[HD3SS3220 Reliable Power-On Control](research/hd3ss3220-reliable-power-on-control.md)
+is an unpopulated alternative when that proof is required. `HD3SS3220` is not
+a USB PD protocol controller, which matches the current 5 V host-powered
 analyzer port.
 
 The part supports USB 3.1 Gen 1/Gen 2 signaling up to 10 Gbps. The board link
-remains limited by the CH32H417 USB 3.2 Gen 1 interface. See
+remains limited by the CH32H417 USB 3.2 Gen 1 interface. The selected board
+process does not provide controlled impedance or length-matching acceptance,
+so USB is accepted as a best-effort prototype link after bidirectional plug
+tests, not as a USB-IF or guaranteed 5-Gbps design. See
 [HD3SS3220 fixed-UFP peripheral review](research/hd3ss3220-ufp-peripheral-review.md)
 for the complete connection constraints and BOM.
 
@@ -124,11 +130,11 @@ data sheet and confirm its `Isat` test definition.
 Sources: [EA3036C data sheet](https://datasheet.lcsc.com/datasheet/pdf/d83e9c52d5fbdb916908193b63b8ae60.pdf?productCode=C570857),
 [SHC252012 electrical evidence](evidence/shc252012-electrical-characteristics.png)
 
-The power rail, current budget, TPS25200 peripheral values, and HD3SS3220
-power-good circuit are selected together in
-[Power Architecture](research/power-architecture.md). That document is the
-source of truth for the non-`VIO18` rails. The external `VIO18` circuit remains
-the existing schematic implementation; see the evidence boundary there.
+The power rail, current budget, and TPS25200 peripheral values are documented
+in [Power Architecture](research/power-architecture.md). That document records
+the current non-`VIO18` rail topology and the monitor alternative separately.
+The external `VIO18` circuit remains the existing schematic implementation;
+see the evidence boundary there.
 
 ## Open Design Decisions
 
@@ -149,8 +155,9 @@ the existing schematic implementation; see the evidence boundary there.
   conversion range at each selected `VIO18` mode.
 - Check EA3036C output ripple, startup, thermal rise, and the selected
   3.32-V `3V3` / external-`VIO18` / 1.218-V `1V2` rail budget at realistic loads.
-- Confirm the TPS3898-controlled `ENn_CC` is high during every supply ramp and
-  remains high for at least 2 ms after both HD3SS3220 supply rails are valid.
+- Confirm at the HD3SS3220 pins that the direct-GND `ENn_CC` implementation
+  satisfies TI's allowed `VDD5`-before-`VCC33` startup condition in every
+  required power event.
 - Verify `VDD5` remains above 4.5 V at HD3SS3220 and that full-rate capture is
   not enabled on a Default-current Type-C source.
 - Enumerate USB SuperSpeed in both Type-C plug orientations and validate

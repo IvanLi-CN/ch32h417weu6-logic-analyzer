@@ -89,7 +89,7 @@ needed only when a passive relative sequence is an explicit requirement.
 The current board uses this policy:
 
 ```text
-EN1 <- VDD5
+EN1 <- VDD5 through 100 kOhm, with 1 uF to GND
 EN2 <- 3V3 through R5 = 10 kOhm, with C15 = 100 nF to GND
 EN3 <- 3V3 through R6 = 10 kOhm, with C16 = 100 nF to GND
 ```
@@ -103,8 +103,10 @@ fully stable before the other two channels start. This does not violate a WCH
 rail-order requirement because none is specified.
 
 This conclusion covers the CH32H417 and EA3036C rails only. It does not waive
-the independent HD3SS3220 `VDD5`/`VCC33` power-on constraint. That requirement
-is handled by the dedicated TPS3898A circuit, not by changing EA3036C EN pins.
+the independent HD3SS3220 `VDD5`/`VCC33` power-on constraint. The current
+netlist uses the EN1 RC together with `ENn_CC` tied to GND, so this condition
+must be verified at the HD3SS3220 pins. A TPS3898A circuit is only an
+unpopulated alternative for a future timing-guaranteed design.
 
 ## Selected Implementation
 
@@ -114,7 +116,8 @@ supply domains. A hard guaranteed "CH1 fully settled before the other channels
 may start" criterion would be a separate system-level requirement; the present
 EA3036C data sheet does not provide enough worst-case parameters to certify a
 component value for it. This does not replace the separately required
-HD3SS3220 controlled `ENn_CC` circuit.
+HD3SS3220 startup-timing measurement for the direct-GND `ENn_CC`
+implementation.
 
 ## Sources
 
@@ -124,4 +127,4 @@ HD3SS3220 controlled `ENn_CC` circuit.
 - [EA3036C vendor data sheet hosted by LCSC, Ver. 1.4](https://datasheet.lcsc.com/datasheet/pdf/d83e9c52d5fbdb916908193b63b8ae60.pdf?productCode=C570857), pages 2, 5, and 11.
 - Local copy: `docs/datasheets/everanalog-ea3036c-datasheet/EA3036C.pdf`
 - [Power Architecture](power-architecture.md): final rail assignment, load
-  budget, and HD3SS3220 power-good circuit.
+  budget, and HD3SS3220 startup-timing boundary.

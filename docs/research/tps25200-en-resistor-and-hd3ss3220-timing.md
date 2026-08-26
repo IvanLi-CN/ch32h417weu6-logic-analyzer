@@ -71,11 +71,13 @@ valid. It is a specified power-on condition, not a recommendation for lower
 noise or a controller startup preference.
 
 The current netlist ties `ENn_CC` directly to ground. It feeds `VDD5` from the
-protected 5-V rail and derives `VCC33` from a buck channel whose enable is
-tied directly to that same 5-V rail. This shows common origin, but proves
-neither the required 2-ms lead of `VDD5` nor the controlled-enable sequence.
-It can work on a particular assembled board, but it is not guaranteed by the
-published component specifications.
+protected 5-V rail and delays the main 3.3-V buck enable through `100 kOhm`
+with `1 uF` from that EN node to GND. This shows the intended startup
+separation, but the EA3036C data sheet still does not provide enough EN and
+output-startup limits to prove either the required 2-ms lead of `VDD5` or the
+controlled-enable sequence over all conditions. It can work on a particular
+assembled board, but it is not guaranteed by the published component
+specifications.
 
 Source: [TI HD3SS3220 data sheet, Rev. E, Section 6.3.12 and power-on timing table](https://www.ti.com/lit/ds/symlink/hd3ss3220.pdf).
 

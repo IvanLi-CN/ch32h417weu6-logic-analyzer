@@ -26,10 +26,10 @@ so it is not a complete input-overvoltage interlock.
 
 | Device | Pin | Direction and active state | Project disposition |
 | --- | --- | --- | --- |
-| TPS25200 | `EN` | Input; high enables the eFuse power switch. | `300 kOhm` pull-up to `VBUS_RAW`; no cross-chip connection. |
+| TPS25200 | `EN` | Input; high enables the eFuse power switch. | `330 kOhm`, 5%, pull-up to `VBUS_RAW`; no cross-chip connection. |
 | TPS25200 | `FAULT` | Active-low open-drain output for overcurrent, overtemperature, or OVLO; it does not assert in OVC mode. | Leave NC; no reliable downstream-MCU observation function is selected. |
-| EA3036C | `EN1`, `EN2`, `EN3` | Inputs; high enables the respective buck channel. No external fault-status output exists. | `EN1` connects to `VBUS_5V_PROTECTED`; `EN2` and `EN3` use separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No cross-chip fault control is selected. |
-| HD3SS3220 | `ENn_CC` | Input; low enables the CC controller. | No connection to TPS25200 or EA3036C control pins. Connect to the TPS3898A open-drain output with a VDD5 pull-up; the supervisor releases it only after `VCC33` is valid. |
+| EA3036C | `EN1`, `EN2`, `EN3` | Inputs; high enables the respective buck channel. No external fault-status output exists. | `EN1` is driven from `VBUS_5V_PROTECTED` through `100 kOhm`, with `1 uF` to GND; `EN2` and `EN3` use separate `3V3`-referenced `10 kOhm / 100 nF` RC networks. No cross-chip fault control is selected. |
+| HD3SS3220 | `ENn_CC` | Input; low enables the CC controller. | Current netlist: tie to GND. It has no cross-chip FAULT/EN connection and requires the separate `VDD5`/`VCC33` timing measurement documented in the peripheral review. |
 | HD3SS3220 | `ENn_MUX` | Input; low enables the SuperSpeed mux. | Tie to GND in this fixed UFP design. |
 | HD3SS3220 | `VCONN_FAULT_N` | Active-low open-drain output only for VCONN overcurrent. | Leave NC: a fixed UFP/Sink does not source VCONN. |
 
@@ -52,10 +52,10 @@ pull-up/RC network and the FAULT sink-current limit are analyzed together.
 That is a different power-policy design, not a free connection in the selected
 circuit.
 
-The EA3036C enables are intentionally local-only: `EN1` is connected to
-`VBUS_5V_PROTECTED`, while `EN2` and `EN3` are delayed from `3V3` through their
-own RC networks. This establishes the selected always-on CH32H417 power policy;
-it is not an HD3SS3220 timing guarantee. The TPS25200 does not assert FAULT in
+The EA3036C enables are intentionally local-only: `EN1` is delayed from
+`VBUS_5V_PROTECTED` through `100 kOhm / 1 uF`, while `EN2` and `EN3` are
+delayed from `3V3` through their own RC networks. This establishes the selected
+always-on CH32H417 power policy; it is not an HD3SS3220 timing guarantee. The TPS25200 does not assert FAULT in
 OVC mode, so a FAULT-to-EN connection cannot serve as a general input-overvoltage
 shutdown policy.
 
@@ -71,14 +71,14 @@ needed for the current protected USB-powered analyzer.
 ## Required Net Connections
 
 ```text
-TPS25200 EN       <- 300 kOhm <- VBUS_RAW
+TPS25200 EN       <- 330 kOhm <- VBUS_RAW
 TPS25200 FAULT    <- NC
 
-EA3036C EN1       <- VBUS_5V_PROTECTED
+EA3036C EN1       <- VBUS_5V_PROTECTED through 100 kOhm; 1 uF to GND
 EA3036C EN2       <- 3V3 through R5 = 10 kOhm; C15 = 100 nF to GND
 EA3036C EN3       <- 3V3 through R6 = 10 kOhm; C16 = 100 nF to GND
 
-HD3SS3220 ENn_CC  <- TPS3898A.SENSE_OUT, with 12 kOhm pull-up to VDD5
+HD3SS3220 ENn_CC  <- GND
 HD3SS3220 ENn_MUX <- GND
 HD3SS3220 VCONN_FAULT_N <- NC
 ```
@@ -88,4 +88,4 @@ HD3SS3220 VCONN_FAULT_N <- NC
 - [TI TPS25200 data sheet, Rev. F](https://www.ti.com/lit/ds/symlink/tps25200.pdf), pin functions and Sections 7.3.1 and 7.3.4.
 - [Everanalog EA3036C data sheet](https://datasheet.lcsc.com/szlcsc/2005300208_Everanalog-IC-design-EA3036C_C570857.pdf), electrical characteristics and Enable Control section.
 - [TI HD3SS3220 data sheet, Rev. E](https://www.ti.com/lit/ds/symlink/hd3ss3220.pdf), pin functions and Sections 6.3.9 and 6.3.12.
-- [HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md): selected TPS3898A circuit.
+- [HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md): unpopulated monitor alternative for a future timing-guaranteed design.

@@ -21,11 +21,11 @@ negotiation.
 | Control mode | `ADDR` to GND | Selects I2C mode at 7-bit address `0x47`. |
 | I2C master pins | `PB10` as `I2C2_SCL` (AF4) and `PB11` as `I2C2_SDA` (AF4) | New-project allocation; verify against the saved LCEDA schematic before routing. |
 | I2C electrical connection | Connect `PB10` directly to `SCL/OUT2` and `PB11` directly to `SDA/OUT1`; add one `4.7 kOhm`, 5%, `0402` pull-up from each line to external `VIO18` | HD3SS3220 specifies a 1.65 V to 3.6 V I2C supply range. The existing VIO18 circuit must remain in that range while I2C is active; no level-shifter is used. |
-| CC termination | `CC1` and `CC2` to the receptacle CC contacts; no external `Rd` resistors | The controller supplies the UFP `Rd` internally: 4.6 kOhm to 5.6 kOhm, 5.1 kOhm typical. Do not fit the two external 5.1 kOhm CC pull-downs used by a discrete-CC design. |
+| CC termination | Use the project port mapping in the peripheral review; no external `Rd` resistors | The controller supplies the UFP `Rd` internally: 4.6 kOhm to 5.6 kOhm, 5.1 kOhm typical. Do not fit the two external 5.1 kOhm CC pull-downs used by a discrete-CC design. |
 | VBUS sense | One `910 kOhm`, 1% resistor from `VBUS_RAW` to `VBUS_DET` | `VBUS_RAW` is the connector VBUS node before TPS25200. The pin senses 4 V to 28 V through this resistor; it is not a VBUS supply input. |
 | 5 V supply | `VDD5` from `VBUS_5V_PROTECTED` | This is the TPS25200 output and must be 4.5 V to 5.5 V. |
 | 3.3 V supply | `VCC33` from the EA3036C fixed 3.3 V output | Required range is 3.0 V to 3.6 V. |
-| CC controller enable | `TPS3898ADRYT.SENSE_OUT` drives `ENn_CC`; add the selected 12 kOhm pull-up from `VDD5` and the supervisor's `VCC33` divider/CT network. | This implements the HD3SS3220 controlled-enable condition without altering the local EA3036C enable policy (`EN1` direct; `EN2`/`EN3` from `3V3` RC). |
+| CC controller enable | Current netlist: `ENn_CC` is tied to GND. The main 3.3-V buck enable is delayed from protected 5 V through `100 kOhm / 1 uF`. | This is a measured-prototype path, not a component-specification timing guarantee. The required `VDD5`/`VCC33` timing must be verified at the controller pins. |
 | Mux enable | Hold `ENn_MUX` low in normal operation | Enables the SuperSpeed mux. A permanently enabled port may tie it to GND. |
 | Orientation status | Pull `DIR` up to `VCC33` with 200 kOhm | `DIR` is open drain and TI specifies this pull-up for proper operation. No MCU handling is needed for mux orientation. |
 | Source-current selector | `CURRENT_MODE` NC | It is a don't-care input in UFP mode. |
@@ -61,22 +61,28 @@ protected side. The VBUS TVS decision remains separate from HD3SS3220.
 
 ## SuperSpeed Link
 
-Connect the CH32H417 SuperSpeed TX/RX pairs to `TXp/TXn` and `RXp/RXn`, and
-the receptacle's two reversible SuperSpeed lane sets to `TX1/TX2` and
-`RX1/RX2`, following the TI UFP reference circuit. Connect the CH32H417 TX
-pair directly to `TXp/TXn`. Fit four `100 nF` AC-coupling capacitors, one in
-each conductor of the Type-C-facing `TX1p/n` and `TX2p/n` paths; TI permits
-75 nF to 200 nF. Do not add a second series-coupling pair between the CH32H417
-and `TXp/TXn`, and do not add coupling capacitors to the receive paths.
+Connect the CH32H417 SuperSpeed TX/RX pairs to `TXp/TXn` and `RXp/RXn`.
+The receptacle-side connection is not same-name: the current netlist applies
+the complete CC/TX/RX mapping recorded in
+[HD3SS3220 fixed-UFP peripheral review](hd3ss3220-ufp-peripheral-review.md#project-port-mapping).
+Fit four `100 nF` AC-coupling capacitors, one in each conductor of the
+Type-C-facing transmit paths; TI permits 75 nF to 200 nF. Do not add a second
+series-coupling pair between the CH32H417 and `TXp/TXn`, and do not add
+coupling capacitors to the receive paths.
 
-The mux does not require transmit-pair length to match receive-pair length;
-only the two conductors within each differential pair require matching. Apply
-the project USB 3 routing rules through the connector, mux, and MCU path.
+The selected fabrication process cannot support controlled-impedance or
+length-matching acceptance. USB 2.0 and USB 3.0 therefore remain best-effort
+prototype links: validate attach, enumeration, and sustained transfer in both
+plug orientations. Do not claim USB-IF compliance or guaranteed 5-Gbps
+operation from the schematic or netlist alone.
 
 ## Prototype Checks
 
 - Enumerate at USB SuperSpeed in both plug orientations.
 - Check attach, detach, and VBUS removal in fixed UFP/Sink mode.
+- Measure `VDD5`, `VCC33`, and `ENn_CC` at the controller during cold start,
+  hot plug, brownout, and cable removal; demonstrate the data-sheet power-on
+  condition for the direct-GND enable connection.
 - Confirm that no external CC `Rd` resistors are populated.
 - Verify I2C2 register access at every selected `VIO18` voltage and only after
   each voltage transition has settled.
@@ -87,8 +93,9 @@ the project USB 3 routing rules through the connector, mux, and MCU path.
 
 The complete project-specific netlist and BOM are in
 [HD3SS3220 fixed-UFP peripheral review](hd3ss3220-ufp-peripheral-review.md).
-The selected power-good circuit is specified in
-[HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md).
+[HD3SS3220 Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md)
+documents an unpopulated monitor alternative for a future design that needs
+component-specification timing closure.
 
 Sources: [TI HD3SS3220 data sheet](https://www.ti.com/lit/ds/symlink/hd3ss3220.pdf)
 and [WCH CH32H417 data sheet](https://www.wch-ic.com/downloads/CH32H417DS0_PDF.html).

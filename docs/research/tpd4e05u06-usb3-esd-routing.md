@@ -21,15 +21,22 @@ logical plug orientations:
 
 | TVS | DQA channel pair | USB-C contact / net | HD3SS3220 port-side signal |
 | --- | --- | --- | --- |
-| `U_ESD_A` | `D1+` / `D1-` | `A2/A3`, `TXP1/TXN1` | `TX1p/TX1n` through the TX1 AC-coupling capacitors |
-| `U_ESD_A` | `D2+` / `D2-` | `A11/A10`, `RXP2/RXN2` | `RX2p/RX2n` |
-| `U_ESD_B` | `D1+` / `D1-` | `B2/B3`, `TXP2/TXN2` | `TX2p/TX2n` through the TX2 AC-coupling capacitors |
-| `U_ESD_B` | `D2+` / `D2-` | `B11/B10`, `RXP1/RXN1` | `RX1p/RX1n` |
+| `U_ESD_A` | `D1+` / `D1-` | `A2/A3`, `TXP1/TXN1` | `TX2p/TX2n` through the Type-C-facing coupling capacitors |
+| `U_ESD_A` | `D2+` / `D2-` | `A11/A10`, `RXP2/RXN2` | `RX1n/RX1p` |
+| `U_ESD_B` | `D1+` / `D1-` | `B2/B3`, `TXP2/TXN2` | `TX1p/TX1n` through the Type-C-facing coupling capacitors |
+| `U_ESD_B` | `D2+` / `D2-` | `B11/B10`, `RXP1/RXN1` | `RX2n/RX2p` |
 
 Thus, one TVS protects the physical A side (`TX1` plus `RX2`) and the other
 protects the physical B side (`TX2` plus `RX1`). Do not interpret those two
 pairs as one logical plug orientation. The mux selects the corresponding TX
 and RX paths internally.
+
+The project uses a complete 1/2 mapping: physical `CC1` goes to controller
+`CC2`, physical `CC2` goes to controller `CC1`, and the TX/RX relationships in
+the table change with it. The receive P/N order is also reversed at the
+controller. This is the observed netlist mapping, not a license to alter one
+CC or lane connection independently. The authoritative complete table is in
+[HD3SS3220 fixed-UFP peripheral review](hd3ss3220-ufp-peripheral-review.md#project-port-mapping).
 
 Do not use one `TPD4E05U06DQAR` for the complete port: it protects only four
 of the eight SuperSpeed conductors. A reversed plug would leave one selected
@@ -50,10 +57,15 @@ coupling capacitors.
 - Connect DQA pins `3` and `8` to the ground plane with low-inductance paths;
   use nearby ground vias and do not share a long narrow return trace.
 - Preserve each differential pair through the TVS: `D1+` with `D1-`, and
-  `D2+` with `D2-`. Keep the pair's impedance, intra-pair length matching, and
-  reference plane continuous.
+  `D2+` with `D2-`. The selected fabrication process does not support a
+  controlled-impedance or pair-length-matching acceptance gate; retain short,
+  direct, symmetric routing where practical and do not create a branch stub.
 - The four channels are electrically symmetric. The A/B grouping is a layout
   choice for short, direct routing, not a special TX-versus-RX requirement.
+
+The board's USB 2.0 and USB 3.0 paths are best-effort prototype links. Passing
+means attach, enumeration, and sustained transfer in both plug orientations;
+it is not a USB-IF compliance or guaranteed 5-Gbps claim.
 
 ## Sources
 

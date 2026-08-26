@@ -36,14 +36,14 @@ and [WCH CH32H417 data sheet](https://www.wch-ic.com/downloads/CH32H417DS0_PDF.h
 | `U1.VDD5` | Connect to `VBUS_5V_PROTECTED`. Fit `C1 = 100 nF`, 10 V, X7R, `0402` from `VDD5` to GND at U1. | Required 5 V CC-controller supply. | TI specifies `VDD5 = 4.5 V` to `5.5 V`; the UFP reference shows 100 nF local supply decoupling. See Sections 5.3 and 7.2.4, Table 7-3. |
 | `U1.VCC33` | Connect to the board `3.3 V` rail. Fit `C2 = 100 nF`, 6.3 V, X7R, `0402` from `VCC33` to GND at U1. | Required mux supply. | TI specifies `VCC33 = 3.0 V` to `3.6 V`; the UFP reference shows 100 nF local supply decoupling. See Sections 4, 5.3, and 7.2.4. |
 | `U1.GND` pins 13, 28 and exposed pad | Connect directly to GND. | Required. | Section 4 requires the thermal pad to connect to GND. |
-| `U1.CC1`, `U1.CC2` | Connect directly to the matching USB-C receptacle `CC1` and `CC2` contacts. Fit **no external CC pull-down resistors**. | Required. | In UFP mode the device provides internal `Rd = 4.6 kOhm` to `5.6 kOhm`, 5.1 kOhm typical. See Sections 4 and 5.5. |
+| `U1.CC1`, `U1.CC2` | Use the complete project port mapping in [Project Port Mapping](#project-port-mapping). Fit **no external CC pull-down resistors**. | Required. | In UFP mode the device provides internal `Rd = 4.6 kOhm` to `5.6 kOhm`, 5.1 kOhm typical. See Sections 4 and 5.5. |
 | `R1` | `910 kOhm`, 1%, `0402`, from `VBUS_RAW` to `U1.VBUS_DET`. | Required. | TI requires one resistor from system VBUS to `VBUS_DET` for UFP attach/detach detection. The 900 kOhm nominal UFP reference value is shown in Figure 7-3. A 910 kOhm nominal part is at the high end of the 880 kOhm to 910 kOhm recommended range, and its +1% value remains below the 920 kOhm electrical maximum. See Sections 4, 5.3, 5.5, 6.3.11, and 7.2.4. |
 | `U1.PORT` | Tie directly to GND. | Required fixed-role configuration. | `PORT = L` selects UFP. The value is sampled when `ENn_CC` is low and `VDD5` is active. See Section 4. |
 | `U1.ADDR` | Tie directly to GND. | Required I2C configuration. | Low `ADDR` selects I2C mode at the 7-bit address `0x47`. See Sections 4 and 6.3.10. |
 | `U1.CURRENT_MODE` | Leave electrically NC. | Required disposition for this fixed UFP use. | The pin is explicitly a don't-care in UFP mode; its DFP current-advertisement resistors do not apply. See Section 4. |
 | `U1.ENn_MUX` | Tie directly to GND. | Required for an always-active USB 3 mux. | It is active low: low is normal operation and high is shutdown. See Section 4. |
 | `U1.DIR` | Fit `R2 = 200 kOhm`, 1%, `0402` from `DIR` to `VCC33`. Do not drive the pin from the MCU. | Required pull-up; the MCU need not consume the signal. | `DIR` is an open-drain orientation output and TI states that a 200 kOhm pull-up **must** be installed for proper operation. The mux uses orientation internally. See Sections 4 and 7.2.4, Table 7-3. |
-| `U1.ENn_CC` | Connect to `TPS3898ADRYT.SENSE_OUT`; fit the selected 12 kOhm pull-up from `VDD5`, divider from `VCC33`, and 47 nF CT capacitor. Do not connect to any TPS25200 or EA3036C `FAULT`/`EN` pin. | Required to enable CC operation. | This implements TI's controlled-enable requirement for the non-failsafe pull-ups. See Section 6.3.12 and [Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md). |
+| `U1.ENn_CC` | Current netlist: tie directly to GND. Do not connect it to a TPS25200 or EA3036C `FAULT`/`EN` pin. | Conditional direct-enable implementation. | A direct low level is permitted only when the `VDD5`-before-`VCC33` timing condition below is demonstrated. See Section 6.3.12. |
 | `U1.TXp/TXn` | Connect directly from the CH32H417 transmitter pair to `TXp` and `TXn`. Do not fit an AC-coupling capacitor in this MCU-facing segment. | Required SuperSpeed transmit path. | TI's UFP reference circuit connects the system `SSTXP/SSTXN` pair directly to `TXp/TXn`; its AC-coupling capacitors are on the Type-C-facing TX outputs. See Figure 7-3 and Table 7-3. |
 | `U1.RXp/RXn` | Connect directly to the CH32H417 receiver pair. Do not add an HD3SS3220 AC-coupling capacitor here. | Required SuperSpeed receive path. | TI states that RX pairs are biased by the host receiver; its UFP coupling requirement is TX pairs only. See Section 7.2.4, Table 7-3. |
 | `U1.TX1p/n`, `U1.TX2p/n` | Fit `C3` through `C6`, each `100 nF`, 10 V, X7R, `0402`, one in every conductor between these U1 TX outputs and the matching USB-C SuperSpeed TX lane. | Required Type-C-facing transmit paths. | TI's UFP reference shows four 100 nF AC-coupling capacitors: one in each `TX1p/n` and `TX2p/n` conductor. The permitted value range is 75 nF to 200 nF. See Figure 7-3 and Table 7-3. |
@@ -66,20 +66,65 @@ following condition for a direct `ENn_CC -> GND` connection:
 VDD5 is stable for at least 2 ms before VCC33 reaches its valid level.
 ```
 
-For this project, `VDD5` is `VBUS_5V_PROTECTED`, the TPS25200 output. `VCC33`
-is the EA3036C fixed 3.3 V output. `EN1` connects to `VBUS_5V_PROTECTED`;
-`EN2` and `EN3` each use a `3V3`-referenced `10 kOhm / 100 nF` RC network.
-This is the correct always-on policy for the CH32H417 rails, but the EA3036C
-data sheet gives no maximum start-up timing that proves the 2 ms HD3SS3220
-requirement.
+For this project, `VDD5` is `VBUS_5V_PROTECTED`, the TPS25200 output, and
+`VCC33` is the EA3036C fixed 3.3 V output. The current netlist ties
+`ENn_CC` directly to GND and delays the main 3.3-V channel enable as follows:
 
-Consequently, this project uses TI's controlled `ENn_CC` method rather than a
-permanent GND connection. `TPS3898ADRYT` releases the input to its VDD5
-pull-up during both supply ramps and sinks it only after `VCC33` passes the
-chosen threshold and the CT delay expires. This is a local HD3SS3220 enable decision, not a
-connection from a TPS25200 or EA3036C `FAULT`/`EN` pin.
+```text
+VBUS_5V_PROTECTED -- 100 kOhm -- EA3036C EN1
+                                  |
+                                1 uF
+                                  |
+                                 GND
+```
+
+This is a passive startup-separation attempt, not a component-specification
+proof of the required 2-ms interval. EA3036C does not publish the complete EN
+threshold/hysteresis and output-start-time limits required for a full PVT
+proof. The current 1-uF value must therefore be qualified at the IC pins on
+the assembled board during cold start, hot plug, brownout, and cable removal.
+The netlist review records a separate passive-margin recommendation; that is
+not a claim that the current 1-uF network already closes the timing condition.
+
+An open-drain monitor such as the circuit in
+[Reliable Power-On Control](hd3ss3220-reliable-power-on-control.md) remains
+an alternative when component-specification timing closure is required. It is
+not populated by the current netlist.
 
 Evidence: [Sections 5.6 and 6.3.12](https://www.ti.com/lit/ds/symlink/hd3ss3220.pdf).
+
+## Project Port Mapping
+
+The current netlist applies one complete 1/2 permutation between the physical
+Type-C contact groups and the controller. It is not a same-name reference
+connection:
+
+| Physical Type-C contact group | CC mapping | Transmit mapping | Receive mapping |
+| --- | --- | --- | --- |
+| A side: `A5`, `A2/A3`, `A11/A10` | `CC1 -> CC2` | `TX1+/- -> TX2p/n` through the Type-C-facing coupling capacitors | `RX2+/- -> RX1n/p` (P/N reversed) |
+| B side: `B5`, `B2/B3`, `B11/B10` | `CC2 -> CC1` | `TX2+/- -> TX1p/n` through the Type-C-facing coupling capacitors | `RX1+/- -> RX2n/p` (P/N reversed) |
+
+This mapping must be treated as one atomic connection set: CC, TX lane
+selection, and RX lane selection must all remain paired as shown. Do not change
+one part of this table in isolation. The controller's `DIR` pin is only pulled
+up and is not consumed by the current system. If firmware later consumes `DIR`
+or an I2C orientation status bit as a physical receptacle-side indication, it
+must interpret the result with this 1/2 permutation applied.
+
+TI's UFP reference figure uses same-name CC and lane connections. This table
+documents the project's different, observed netlist mapping; it does not turn
+an arbitrary partial lane or CC swap into a permitted general rule. Functional
+acceptance of this non-reference mapping is the two-orientation link test
+defined below.
+
+## Link Acceptance Boundary
+
+The selected fabrication process cannot supply controlled differential
+impedance or length-matching acceptance. The project therefore does not impose
+90-ohm, P/N length-match, field-solver, or TDR/eye-diagram gates on this board.
+USB 2.0 and USB 3.0 are best-effort prototype links: acceptance is successful
+attach, enumeration, and sustained transfer in both plug orientations. This
+does not constitute a USB-IF compliance or 5-Gbps performance claim.
 
 ## I2C GPIO Allocation and Firmware Boundary
 
@@ -125,8 +170,8 @@ needs the controller state.
 ## Schematic-Level Netlist
 
 ```text
-USB-C CC1  -------------------------- U1.CC1
-USB-C CC2  -------------------------- U1.CC2
+USB-C CC1  -------------------------- U1.CC2
+USB-C CC2  -------------------------- U1.CC1
 
 USB-C VBUS -------------------------- VBUS_RAW ---------------- TPS25200 IN
 VBUS_RAW ---- R1 910 kOhm, 1% ------- U1.VBUS_DET
@@ -135,7 +180,8 @@ U1.VDD5 ---- C1 100 nF -------------- GND
 Board 3.3 V ------------------------- U1.VCC33
 U1.VCC33 -- C2 100 nF -------------- GND
 
-VBUS_5V_PROTECTED -------------------- EA3036C EN1
+VBUS_5V_PROTECTED -- 100 kOhm -------- EA3036C EN1
+EA3036C EN1 ---- 1 uF ---------------- GND
 3V3 ---- R5 10 kOhm ----+------------- EA3036C EN2
                           |
                         C15 100 nF
@@ -151,7 +197,7 @@ U1.PORT ----------------------------- GND
 U1.ADDR ----------------------------- GND (I2C 7-bit address 0x47)
 U1.CURRENT_MODE --------------------- NC
 U1.ENn_MUX -------------------------- GND
-U1.ENn_CC --------------------------- TPS3898ADRYT.SENSE_OUT, 12 kOhm pull-up to VDD5
+U1.ENn_CC --------------------------- GND
 U1.DIR ---- R2 200 kOhm ------------- U1.VCC33
 
 PB10 (I2C2_SCL, AF4) ---------------- U1.SCL/OUT2
@@ -165,11 +211,10 @@ CH32H417 SSTX- ---------------------- U1.TXn
 CH32H417 SSRX+ ---------------------- U1.RXp
 CH32H417 SSRX- ---------------------- U1.RXn
 
-U1.TX1p ---- C3 100 nF -------------- matching USB-C TX1 conductor
-U1.TX1n ---- C4 100 nF -------------- matching USB-C TX1 conductor
-U1.TX2p ---- C5 100 nF -------------- matching USB-C TX2 conductor
-U1.TX2n ---- C6 100 nF -------------- matching USB-C TX2 conductor
-U1.RX1/RX2 -------------------------- matching USB-C SuperSpeed RX lane pairs
+USB-C TX1+/- ------------------------ U1.TX2p/n through 100 nF coupling
+USB-C TX2+/- ------------------------ U1.TX1p/n through 100 nF coupling
+USB-C RX2+/- ------------------------ U1.RX1n/p
+USB-C RX1+/- ------------------------ U1.RX2n/p
 U1.GND pins and exposed pad --------- GND
 ```
 
