@@ -1,0 +1,2 @@
+# The LCEDA source project is a local hard-linked input, not a Git artifact.
+*.eprj2
