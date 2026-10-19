@@ -326,7 +326,7 @@ void UART_Rx_Deal(void)
                     {
                         if (UART1_Rx() == Uart_Sync_Head1)
                         {
-                            s = UART_RecData_Deal();
+                            s = RecData_Deal();
 
                             if (s != ERR_End)
                             {
