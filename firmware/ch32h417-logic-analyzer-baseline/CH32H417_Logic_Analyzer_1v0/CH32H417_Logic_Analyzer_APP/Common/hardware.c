@@ -41,9 +41,7 @@ void VDDI8_IO_Change(void)
  */
 void Hardware(void)
 {
-    /* Disable SWD */
-    RCC_HB2PeriphClockCmd(RCC_HB2Periph_AFIO, ENABLE);
-    GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);
+    /* Keep SWJ available for WCH-Link debug and recovery. */
     /* Enable the IO function of PC6 pins */
     RCC_HB1PeriphClockCmd(RCC_HB1Periph_SWPMI, ENABLE);
     SWPMI->OR |= SWPMI_SWP_TBYP;

@@ -8,8 +8,8 @@ __attribute__((aligned(4))) uint8_t USB_In_Buf[DEF_IAP_USB_PACK_SIZE] = {0};
  * @brief  Initialize USB ports (USBFS/USBHS).
  * 
  * This function enables or disables the USBFS and USBHS device ports 
- * depending on the given state. For USBHS, it also disables the SWD 
- * (Serial Wire Debug) to free up the corresponding pins.
+ * depending on the given state. The SWJ debug interface remains available
+ * during bring-up so WCH-Link can recover the target when needed.
  * 
  * @param sta  ENABLE to initialize USB ports, DISABLE to deinitialize them.
  */
@@ -24,10 +24,6 @@ void USB_Init(FunctionalState sta)
 #endif
 
 #if DEF_USBHS_PORT_ENABLE
-        /* Disable SWD */
-        RCC_HB2PeriphClockCmd(RCC_HB2Periph_AFIO | RCC_HB2Periph_GPIOB, ENABLE);
-        GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);
-
         /* Enable USBHS Port */
         USBHS_Device_Init(ENABLE);
 #endif        
@@ -41,11 +37,7 @@ void USB_Init(FunctionalState sta)
 #endif
 
 #if DEF_USBHS_PORT_ENABLE
-        /* Disable SWD */
-        RCC_HB2PeriphClockCmd(RCC_HB2Periph_AFIO | RCC_HB2Periph_GPIOB, ENABLE);
-        GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);
-
-        /* Enable USBHS Port */
+        /* Disable USBHS Port */
         USBHS_Device_Init(DISABLE);
 #endif        
     }
