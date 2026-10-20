@@ -4,6 +4,8 @@
 
 - [Hardware Selection](SELECTION.md): current component and architecture
   choices, open decisions, and the required prototype validation.
+- [Firmware Baseline](../firmware/README.md): pinned CH32H417 source tree,
+  build entry points, provenance, and board-porting gates.
 
 ## Research
 
